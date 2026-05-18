@@ -19,14 +19,19 @@ class K8sEnvironmentManager:
         self.namespace = "eci-sandboxes"
 
     def provision_sandbox(self, student_id: uuid.UUID, course_code: str, env_type: str) -> dict:
-        """Dynamically spins up a secure C++ sandbox pod for a specific student."""
+        """Dynamically spins up a secure sandbox pod for a specific student."""
         
         engine_tag = os.getenv("CPP_ENGINE_TAG", "latest")
-        # 🚀 SRE Dynamic Image Routing!
+        
+        # 🚀 HYBRID CLOUD LOGIC: Get registry from Env Var (set by Makefile)
+        registry = os.getenv("IMAGE_REGISTRY", "")
+        prefix = f"{registry}/" if registry else ""
+        
+        # 🚀 Dynamic Image Routing
         if env_type.lower() in ["cpp", "c++", "c"]:
-            dynamic_image = f"eci-cpp-engine:{engine_tag}"
+            dynamic_image = f"{prefix}eci-cpp-engine:{engine_tag}"
         else:
-            dynamic_image = f"eci-python-engine:{engine_tag}" # Default lightweight image
+            dynamic_image = f"{prefix}eci-python-engine:{engine_tag}"
         
         pod_name = f"sandbox-{course_code.lower()}-{str(student_id)[:8]}"
         

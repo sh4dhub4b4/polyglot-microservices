@@ -1,22 +1,20 @@
-# Generate a completely unique dynamic tag based on current timestamp
+# Hybrid Smart Makefile
 TAG := $(shell date +%s)
 
-.PHONY: init build clean deploy all tst
+# ⚠️ TUMI EKHAANE TOMAR GITHUB USERNAME DEBE (lowercase e)
+GITHUB_USER := sh4dhub4b4
+REGISTRY := ghcr.io/$(GITHUB_USER)
 
-# 🚀 CRITICAL CLUSTER FIX: Automatically creates namespaces and applies base k8s files if wiped out
+.PHONY: init build-local clean deploy-local try-cloud deploy-cloud all tst
+
 init:
 	@echo "🛠️ Checking and Initializing Kubernetes Namespaces..."
-	kubectl create namespace eci-system --dry-run=client -o yaml | kubectl apply -f -
-	kubectl create namespace eci-sandboxes --dry-run=client -o yaml | kubectl apply -f -
-	@echo "📄 Applying base cluster deployments from manifests..."
-	@if [ -d "k8s" ]; then \
-		kubectl apply -f k8s/; \
-	else \
-		echo "⚠️ Warning: 'k8s' folder not found. Skipping base manifest apply."; \
-	fi
+	@kubectl create namespace eci-system --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl create namespace eci-sandboxes --dry-run=client -o yaml | kubectl apply -f -
+	@if [ -d "k8s" ]; then kubectl apply -f k8s/; fi
 
-build:
-	@echo "📦 Building isolated images with unique tag: v$(TAG)..."
+build-local:
+	@echo "📦 [LOCAL] Building images with unique tag: v$(TAG)..."
 	docker build -t eci-python-engine:v$(TAG) -f src/cpp-processing-engine/Dockerfile.python src/cpp-processing-engine/
 	docker build -t eci-cpp-engine:v$(TAG) -f src/cpp-processing-engine/Dockerfile.cpp src/cpp-processing-engine/
 	docker build -t eci-orchestrator:v$(TAG) -f src/environment-orchestrator/Dockerfile src/environment-orchestrator/
@@ -24,23 +22,42 @@ build:
 
 clean:
 	@echo "🧹 Cleaning old sandboxes..."
-	kubectl delete pods --all -n eci-sandboxes --ignore-not-found=true
+	@kubectl delete pods --all -n eci-sandboxes --ignore-not-found=true
 
-deploy: init
-	@echo "🔄 Injecting Dynamic Tag (v$(TAG)) to Kubernetes Clusters..."
-	# Now these will NEVER fail because 'init' guaranteed the namespace and deployment exist!
+deploy-local: init
+	@echo "🔄 [LOCAL] Injecting Local Images to K8s..."
 	kubectl set image deployment/eci-gateway gateway=eci-gateway:v$(TAG) -n eci-system
 	kubectl set image deployment/eci-orchestrator orchestrator=eci-orchestrator:v$(TAG) -n eci-system
-	kubectl set env deployment/eci-orchestrator CPP_ENGINE_TAG=v$(TAG) -n eci-system
-	
-	@echo "⏳ Waiting for K8s pods to fully rollout and stabilize..."
+	kubectl set env deployment/eci-orchestrator CPP_ENGINE_TAG=v$(TAG) IMAGE_REGISTRY="" -n eci-system
 	kubectl rollout status deployment/eci-gateway -n eci-system
 	kubectl rollout status deployment/eci-orchestrator -n eci-system
+
+deploy-cloud: init
+	@echo "☁️ [CLOUD] Injecting GHCR Images to K8s..."
+	kubectl set image deployment/eci-gateway gateway=$(REGISTRY)/eci-gateway:latest -n eci-system
+	kubectl set image deployment/eci-orchestrator orchestrator=$(REGISTRY)/eci-orchestrator:latest -n eci-system
+	kubectl set env deployment/eci-orchestrator CPP_ENGINE_TAG=latest IMAGE_REGISTRY="$(REGISTRY)" -n eci-system
+	kubectl rollout status deployment/eci-gateway -n eci-system
+	kubectl rollout status deployment/eci-orchestrator -n eci-system
+
+# 🚀 The Master Hybrid Command
+all:
+	@echo "🌐 Checking Cloud Registry ($(REGISTRY)) for latest gateway image..."
+	@docker pull $(REGISTRY)/eci-gateway:latest > /dev/null 2>&1; \
+	if [ $$? -eq 0 ]; then \
+		echo "✅ Cloud images accessible! Deploying from GHCR..."; \
+		$(MAKE) clean deploy-cloud; \
+	else \
+		echo "⚠️ Cloud images NOT FOUND or you are offline."; \
+		read -p "Shift to Local Development Build? [y/N]: " ans; \
+		if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]; then \
+			echo "🚀 Initiating Local Build Sequence..."; \
+			$(MAKE) build-local clean deploy-local; \
+		else \
+			echo "❌ Deployment aborted by user."; exit 1; \
+		fi; \
+	fi
 
 tst:
 	@echo "🚀 Running the e2e test script..."
 	python test_e2e_gauntlet.py
-
-# The master workflow now safely starts with 'init'
-all: init build clean deploy
-	@echo "✅ All pipeline stages done! System fully upgraded to v$(TAG). Run 'make tst' to test."

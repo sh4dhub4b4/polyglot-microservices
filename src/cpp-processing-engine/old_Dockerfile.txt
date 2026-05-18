@@ -1,0 +1,22 @@
+# Use Ubuntu as the base OS
+FROM ubuntu:22.04
+
+# Install g++ (to compile the C++ server) and python3 (to run student code)
+RUN apt-get update && \
+    apt-get install -y g++ python3 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy the C++ source code from your local machine to the container
+COPY src/ ./src/
+
+# Compile the C++ Sandbox Engine (httplib needs -pthread)
+RUN g++ -O3 -std=c++17 src/main.cpp -o engine_binary -pthread
+
+# Expose the API port so Kubernetes can talk to it
+EXPOSE 8080
+
+# Command to run when the container starts
+CMD ["./engine_binary"]
