@@ -1,0 +1,42 @@
+version: '3.8'
+services:
+  ai-worker:
+    build:
+      context: ../
+      dockerfile: docker/runtime/Dockerfile.python-ml
+    ports:
+      - "8000:8000"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+    environment:
+      - ENVIRONMENT=production
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  cpp-engine:
+    build:
+      context: ../
+      dockerfile: docker/runtime/Dockerfile.cpp-engine
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

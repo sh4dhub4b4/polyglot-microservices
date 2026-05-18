@@ -1,0 +1,116 @@
+---
+# 1. Namespaces
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: eci-system
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: eci-sandboxes
+---
+# 2. RBAC (Give Orchestrator permission to create Pods)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: orchestrator-sa
+  namespace: eci-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: orchestrator-role
+  namespace: eci-sandboxes
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: orchestrator-rolebinding
+  namespace: eci-sandboxes
+subjects:
+  - kind: ServiceAccount
+    name: orchestrator-sa
+    namespace: eci-system
+roleRef:
+  kind: Role
+  name: orchestrator-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# 3. Environment Orchestrator Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eci-orchestrator
+  namespace: eci-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eci-orchestrator
+  template:
+    metadata:
+      labels:
+        app: eci-orchestrator
+    spec:
+      serviceAccountName: orchestrator-sa
+      containers:
+        - name: orchestrator
+          image: eci-orchestrator:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eci-orchestrator
+  namespace: eci-system
+spec:
+  selector:
+    app: eci-orchestrator
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+---
+# 4. API Gateway Deployment (Exposed to your Windows Machine)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eci-gateway
+  namespace: eci-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eci-gateway
+  template:
+    metadata:
+      labels:
+        app: eci-gateway
+    spec:
+      containers:
+        - name: gateway
+          image: eci-api-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eci-gateway
+  namespace: eci-system
+spec:
+  type: LoadBalancer
+  selector:
+    app: eci-gateway
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8000

@@ -1,0 +1,69 @@
+name: ECI Platform CI/CD Auto-Build
+
+on:
+  push:
+    branches: [ "main", "master" ] # Master ba main branch-e push korlei trigger hobe
+
+env:
+  REGISTRY: ghcr.io
+  # Converts your github username/repo into lowercase automatically
+  IMAGE_BASE: ghcr.io/${{ github.repository }} 
+
+jobs:
+  build-and-push-images:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # GHCR e image push korar permission
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          # GitHub nijeei ei token ta dey, tomar kono password set korte hobe na!
+          password: ${{ secrets.GITHUB_TOKEN }} 
+
+      - name: 🐍 Build & Push Python Engine
+        uses: docker/build-push-action@v5
+        with:
+          context: src/cpp-processing-engine/
+          file: src/cpp-processing-engine/Dockerfile.python
+          push: true
+          tags: |
+            ${{ env.IMAGE_BASE }}/eci-python-engine:latest
+            ${{ env.IMAGE_BASE }}/eci-python-engine:${{ github.sha }}
+
+      - name: ⚙️ Build & Push C++ Engine
+        uses: docker/build-push-action@v5
+        with:
+          context: src/cpp-processing-engine/
+          file: src/cpp-processing-engine/Dockerfile.cpp
+          push: true
+          tags: |
+            ${{ env.IMAGE_BASE }}/eci-cpp-engine:latest
+            ${{ env.IMAGE_BASE }}/eci-cpp-engine:${{ github.sha }}
+
+      - name: 🧠 Build & Push Orchestrator
+        uses: docker/build-push-action@v5
+        with:
+          context: src/environment-orchestrator/
+          file: src/environment-orchestrator/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_BASE }}/eci-orchestrator:latest
+            ${{ env.IMAGE_BASE }}/eci-orchestrator:${{ github.sha }}
+
+      - name: 🌐 Build & Push API Gateway
+        uses: docker/build-push-action@v5
+        with:
+          context: src/api-gateway/
+          file: src/api-gateway/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_BASE }}/eci-gateway:latest
+            ${{ env.IMAGE_BASE }}/eci-gateway:${{ github.sha }}

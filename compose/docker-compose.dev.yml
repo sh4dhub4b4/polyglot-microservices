@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  dev-workspace:
+    build:
+      context: ../
+      dockerfile: docker/dev/Dockerfile
+    volumes:
+      - ../:/workspace:cached
+    ports:
+      - "8888:8888" # Jupyter
+      - "8000:8000" # API
+      - "5678:5678" # Debugpy
+    environment:
+      - ENVIRONMENT=development
+    cap_add:
+      - SYS_PTRACE # Required for C++ GDB debugging
+    security_opt:
+      - seccomp:unconfined
+    command: sleep infinity

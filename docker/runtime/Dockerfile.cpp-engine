@@ -1,0 +1,27 @@
+# Stage 1: The Builder
+FROM ubuntu:22.04 AS builder
+# Install compiler and cmake (removed wget)
+RUN apt-get update && apt-get install -y cmake g++ ca-certificates
+WORKDIR /app
+# This line now copies your code AND the two header files we just downloaded
+COPY src/cpp-processing-engine/ .
+
+# Compile the engine
+RUN mkdir build && cd build && cmake .. && make
+
+# Stage 2: The Secure Runtime
+FROM ubuntu:22.04
+# Create the unprivileged user for security
+RUN groupadd -g 10002 sandboxgroup && useradd -u 10002 -g sandboxgroup -s /bin/false sandboxuser
+
+# INSTALL python-is-python3 so the "python" command works natively
+RUN apt-get update && apt-get install -y python3 python-is-python3 && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /app/build/engine_binary .
+
+# GRANT WRITE PERMISSIONS so the unprivileged sandbox user can create temp.py files
+RUN chmod 777 /app
+
+EXPOSE 8080
+CMD ["./engine_binary"]
