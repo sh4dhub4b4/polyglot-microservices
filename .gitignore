@@ -67,3 +67,12 @@ coverage.xml
 *.tar.gz
 *.tgz
 kubeconfig
+
+.vscode
+*.md
+Makefile
+mock_sandbox.py
+tset_e2e_gauntlet.py
+*.csv
+*teps.txt
+*Dockerfile.txt
