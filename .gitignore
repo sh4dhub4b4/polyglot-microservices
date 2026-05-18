@@ -1,3 +1,69 @@
-.venv
-*.md
-*.csv
+# ========================
+# Python
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+.env
+
+# ========================
+# C/C++ Engine Binaries
+# ========================
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+engine_binary
+/tmp/
+
+# ========================
+# IDE & OS Files
+# ========================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ========================
+# Testing & Logs
+# ========================
+.pytest_cache/
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.log
+
+# ========================
+# K8s & Infrastructure
+# ========================
+*.tar.gz
+*.tgz
+kubeconfig

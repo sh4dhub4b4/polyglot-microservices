@@ -3,7 +3,7 @@ TAG := $(shell date +%s)
 
 # ⚠️ TUMI EKHAANE TOMAR GITHUB USERNAME DEBE (lowercase e)
 GITHUB_USER := sh4dhub4b4
-REGISTRY := ghcr.io/$(GITHUB_USER)
+REGISTRY := ghcr.io/$(GITHUB_USER)/polyglot-microservices
 
 .PHONY: init build-local clean deploy-local try-cloud deploy-cloud all tst
 
