@@ -77,3 +77,4 @@ tset_e2e_gauntlet.py
 *teps.txt
 *Dockerfile.txt
 test_e2e_gauntlet.py
+*.svg
