@@ -9,14 +9,15 @@ class PythonStrategy : public IExecutionStrategy
 {
 public:
     // 👈 NEW: Python er compile lagena, tai direct true
-    bool compile(const std::string &source_code, std::string &compile_errors) override {
-        return true; 
+    bool compile(const std::string &source_code, std::string &compile_errors) override
+    {
+        return true;
     }
 
     ExecutionResult execute(const std::string &source_code, const std::string &stdin_data, int timeout_ms) override
     {
         // 👈 Update: initialize with false for compilation_failed
-        ExecutionResult result = {0, "", "", 0.0, false, false}; 
+        ExecutionResult result = {0, "", "", 0.0, false, false};
 
         // 1. Write the source code
         std::string filename = "/tmp/sandbox_exec.py";
