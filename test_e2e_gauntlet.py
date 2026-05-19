@@ -107,6 +107,14 @@ int main() {
     cout << "\\n[5] Testing Memory Limits (Allocating 600MB)..." << endl;
     try {
         char* ptr = new char[600 * 1024 * 1024]; 
+        
+        // 👈 TUMI EI LOOP TA DITE VULE GESO!
+        // Eita OS ke force korbe actual physical RAM use korte.
+        // Protita 4KB page (Linux default) e ekta kore 'X' likhbe.
+        for(int i = 0; i < 600 * 1024 * 1024; i += 4096) {
+            ptr[i] = 'X'; 
+        }
+        
         cout << "    -> ❌ VULNERABLE: Memory allocation succeeded!" << endl;
         delete[] ptr;
     } catch (const std::bad_alloc& e) {
