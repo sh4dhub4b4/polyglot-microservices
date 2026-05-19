@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: strict-sandbox-isolation
+  namespace: eci-sandboxes
+spec:
+  podSelector: {} # This empty selector means it applies to ALL pods in this namespace
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8080 # Allow API Gateway to talk to the Sandbox
+  egress: [] # 👈 An empty array means DENY ALL OUTBOUND TRAFFIC!

@@ -2,17 +2,60 @@
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <chrono>
+#include <thread>
+#include <signal.h>
+#include <unistd.h>
+#include <sys/wait.h> // Must be included BEFORE the macro hack
 
 // Helper function ekhane niye ashlam jate C++ ar Python duijon e use korte pare
-inline std::string read_file(const std::string &path) {
+inline std::string read_file(const std::string &path)
+{
     std::ifstream file(path);
-    if (!file.is_open()) return "";
+    if (!file.is_open())
+        return "";
     std::stringstream buffer;
     buffer << file.rdbuf();
     return buffer.str();
 }
 
-struct ExecutionResult {
+// 🚀 THE MAGIC: Mother-level system call interceptor
+inline pid_t smart_waitpid(pid_t pid, int *status, int options)
+{
+    auto start_time = std::chrono::steady_clock::now();
+    while (true)
+    {
+        // Use :: to call the real OS waitpid, bypassing the macro
+        pid_t res = ::waitpid(pid, status, WNOHANG);
+        if (res != 0)
+            return res; // Process finished naturally or system error
+
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                           std::chrono::steady_clock::now() - start_time)
+                           .count();
+
+        if (elapsed > 5000)
+        { // Universal 5-second timeout
+            kill(pid, SIGKILL);
+            ::waitpid(pid, status, 0); // Clean up the zombie process
+
+            // Inject timeout message into the error file.
+            // The child strategies will read this naturally without needing code changes!
+            std::ofstream err_file("/tmp/err.txt", std::ios_base::app);
+            err_file << "\n[System] ⏱️ Execution timed out! Infinite loop killed by Mother Strategy.";
+            err_file.close();
+
+            return pid;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+}
+
+// 🛑 MACRO HIJACK: Forces all child files to use our smart_waitpid instead of the OS one
+#define waitpid(pid, status, options) smart_waitpid(pid, status, options)
+
+struct ExecutionResult
+{
     int exit_code;
     std::string stdout_output;
     std::string stderr_output;
@@ -21,13 +64,14 @@ struct ExecutionResult {
     bool compilation_failed; // 👈 NEW: Build error ar Runtime error alada korar jonno
 };
 
-class IExecutionStrategy {
+class IExecutionStrategy
+{
 public:
     virtual ~IExecutionStrategy() = default;
-    
+
     // Stage 1: Returns true if compilation succeeds. Does nothing for Python.
     virtual bool compile(const std::string &source_code, std::string &compile_errors) = 0;
-    
+
     // Stage 2: Executes the binary or script
     virtual ExecutionResult execute(const std::string &source_code, const std::string &stdin_data, int timeout_ms) = 0;
 };

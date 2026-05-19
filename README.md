@@ -42,3 +42,5 @@ Throughout the development and integration lifecycle, several critical architect
     `docker build -t eci-orchestrator:latest -f src/environment-orchestrator/Dockerfile src/environment-orchestrator/`
 3.  Deploy to Kubernetes:
     `kubectl apply -f k8s/eci-cluster-deployment.yaml`
+
+---

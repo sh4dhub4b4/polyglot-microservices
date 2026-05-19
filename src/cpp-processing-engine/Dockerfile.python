@@ -1,13 +1,16 @@
 # Stage 1: Build the C++ Webserver
 FROM ubuntu:22.04 AS builder
-RUN apt-get update && apt-get install -y g++
+RUN apt-get update && apt-get install -y g++ libseccomp-dev
 WORKDIR /build
 COPY src/ ./src/
-RUN g++ -O3 -std=c++17 src/main.cpp -o engine_binary -pthread
+RUN g++ -O3 -std=c++17 src/main.cpp -o engine_binary -pthread -lseccomp
 
 # Stage 2: Python Engine Runtime (Ultra Lean - NO g++)
 FROM ubuntu:22.04
-RUN apt-get update && apt-get install -y python3 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y python3 libseccomp-dev && rm -rf /var/lib/apt/lists/*
+# 🚀 NEW: Create the restricted user and group with ID 10002
+RUN groupadd -g 10002 sandboxuser && \
+    useradd -u 10002 -g 10002 -m -s /bin/bash sandboxuser
 WORKDIR /app
 COPY --from=builder /build/engine_binary /app/engine_binary
 EXPOSE 8080

@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <stdexcept>
+#include <seccomp.h> // 👈 NEW: Linux Kernel system call filtering
 
 class SecurityContainer
 {
@@ -12,6 +13,9 @@ public:
     static constexpr int MAX_MEMORY_MB = 512;
     static constexpr int MAX_CPU_TIME_SEC = 5;
     static constexpr int MAX_FILE_SIZE_MB = 1; // Prevent filling up the hard drive
+
+    // 🚀 NEW: Maximum thread/process count to prevent Fork Bombs
+    static constexpr int MAX_PROCESSES = 50;
 
     // The restricted user ID (must be created in the Dockerfile, e.g., 'sandboxuser')
     static constexpr uid_t SANDBOX_UID = 10002;
@@ -36,7 +40,36 @@ public:
         if (setrlimit(RLIMIT_FSIZE, &rl) != 0)
             throw std::runtime_error("Failed to limit File Size");
 
-        // 4. Drop Root Privileges (Cannot reverse this once dropped)
+        // 🚀 NEW: 3.5 Limit Number of Processes (Fork Bomb Protection)
+        rl.rlim_cur = rl.rlim_max = MAX_PROCESSES;
+        if (setrlimit(RLIMIT_NPROC, &rl) != 0)
+            throw std::runtime_error("Failed to limit Number of Processes");
+
+        // 4. SECCOMP: Kernel-Level System Call Filtering
+        // Initialize the filter to ALLOW all system calls by default...
+        scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_ALLOW);
+        if (ctx == NULL)
+        {
+            throw std::runtime_error("Failed to initialize seccomp");
+        }
+
+        // This completely neutralizes reverse shells, curl, wget, etc.
+        // Ekhon process kill na kore EACCES (Permission Denied) error dibe
+        if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EACCES), SCMP_SYS(socket), 0) < 0)
+        {
+            seccomp_release(ctx);
+            throw std::runtime_error("Failed to add seccomp socket rule");
+        }
+
+        // Load the filter into the Linux kernel for this process
+        if (seccomp_load(ctx) < 0)
+        {
+            seccomp_release(ctx);
+            throw std::runtime_error("Failed to load seccomp filter");
+        }
+        seccomp_release(ctx);
+
+        // 5. Drop Root Privileges (Cannot reverse this once dropped)
         if (setgid(SANDBOX_GID) != 0)
             throw std::runtime_error("Failed to drop GID privileges");
         if (setuid(SANDBOX_UID) != 0)

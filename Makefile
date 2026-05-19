@@ -58,6 +58,11 @@ all:
 		fi; \
 	fi
 
+# 🔨 The Force-Local Command (Intentional Bypass)
+all-local:
+	@echo "🚀 [FORCE LOCAL] Bypassing cloud check. Initiating Intentional Local Build Sequence..."
+	$(MAKE) build-local clean deploy-local
+
 tst:
 	@echo "🚀 Running the e2e test script..."
 	python test_e2e_gauntlet.py
