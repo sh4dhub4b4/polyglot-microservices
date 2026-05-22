@@ -3,7 +3,7 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: 'ai-worker'
-    metrics_path: '/metrics'
+  - job_name: "ai-worker"
+    metrics_path: "/metrics"
     static_configs:
-      - targets: ['host.docker.internal:8000'] # Scrapes the local API container
+      - targets: ["ai-worker-svc.ai-platform.svc.cluster.local:80"] # Scrapes the local API container

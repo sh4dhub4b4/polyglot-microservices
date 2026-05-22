@@ -22,6 +22,8 @@ inline std::string read_file(const std::string &path)
 // 🚀 THE MAGIC: Mother-level system call interceptor
 inline pid_t smart_waitpid(pid_t pid, int *status, int options)
 {
+    // Check if the parent process is a compiler (gcc/go/g++)
+    // SRE NOTE: Compilation is intensive, 5s might be too short for slow CPUs
     auto start_time = std::chrono::steady_clock::now();
     while (true)
     {
@@ -34,8 +36,8 @@ inline pid_t smart_waitpid(pid_t pid, int *status, int options)
                            std::chrono::steady_clock::now() - start_time)
                            .count();
 
-        if (elapsed > 5000)
-        { // Universal 5-second timeout
+        if (elapsed > 15000)
+        { // Universal 15-second timeout
             kill(pid, SIGKILL);
             ::waitpid(pid, status, 0); // Clean up the zombie process
 

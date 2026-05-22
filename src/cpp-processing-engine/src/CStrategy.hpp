@@ -4,30 +4,51 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <string.h>
-#include <fcntl.h> // 🚀 NEW: Required for POSIX open
+#include <fcntl.h>
 #include <iostream>
 
-class PythonStrategy : public IExecutionStrategy
+class CStrategy : public IExecutionStrategy
 {
 public:
-    // Python does not have a separate compile step
     bool compile(const std::string &source_code, std::string &compile_errors) override
     {
+        // Write the source code to a temporary file in the RAM disk
+        std::ofstream source_file("/tmp/main.c");
+        source_file << source_code;
+        source_file.close();
+
+        std::remove("/tmp/compile_err.txt");
+
+        pid_t pid = fork();
+        if (pid == 0)
+        {
+            int fd = open("/tmp/compile_err.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            dup2(fd, STDOUT_FILENO);
+            dup2(fd, STDERR_FILENO);
+            close(fd);
+
+            execlp("gcc", "gcc", "-O2", "/tmp/main.c", "-o", "/tmp/program_c", nullptr);
+
+            std::cout << "[System] Fatal: gcc compiler failed to launch." << std::endl;
+            exit(1);
+        }
+        else
+        {
+            int status;
+            waitpid(pid, &status, 0);
+            if (WEXITSTATUS(status) != 0)
+            {
+                compile_errors = read_file("/tmp/compile_err.txt");
+                return false; // Compilation failed
+            }
+        }
         return true;
     }
 
     ExecutionResult execute(const std::string &source_code, const std::string &stdin_data, int timeout_ms) override
     {
-        // 👈 Update: initialize with false for compilation_failed
         ExecutionResult result = {0, "", "", 0.0, false, false};
 
-        // 1. Write the source code
-        std::string filename = "/tmp/sandbox_exec.py";
-        std::ofstream out(filename);
-        out << source_code;
-        out.close();
-
-        // 2. Write the standard input data BEFORE forking (Security Best Practice)
         std::ofstream in("/tmp/in.txt");
         in << stdin_data;
         in.close();
@@ -36,12 +57,10 @@ public:
         std::remove("/tmp/err.txt");
 
         pid_t pid = fork();
-
-        if (pid == 0) // Child Process
+        if (pid == 0)
         {
             try
             {
-                // 🚀 SRE FIX: Raw POSIX Descriptor Routing (No more swallowed outputs)
                 int fd_in = open("/tmp/in.txt", O_RDONLY);
                 int fd_out = open("/tmp/out.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
                 int fd_err = open("/tmp/err.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
@@ -54,18 +73,14 @@ public:
                 close(fd_out);
                 close(fd_err);
 
-                // 4. Lock down the container
                 SecurityContainer::enforce_limits();
+                execlp("/tmp/program_c", "program_c", nullptr);
 
-                // 5. Execute using OS path lookup (-u forces unbuffered I/O)
-                execlp("python3", "python3", "-u", filename.c_str(), nullptr);
-
-                std::cerr << "[System] Fatal: python3 interpreter failed to launch. Reason: " << strerror(errno) << std::endl;
+                std::cerr << "[System] Failed to execute the compiled C binary." << std::endl;
                 exit(1);
             }
             catch (const std::exception &e)
             {
-                // Catch any kernel or SecurityContainer limits
                 std::cerr << "[Security Kernel] " << e.what() << std::endl;
                 exit(1);
             }
@@ -75,7 +90,7 @@ public:
                 exit(1);
             }
         }
-        else if (pid > 0) // Parent Process
+        else if (pid > 0)
         {
             int status;
             waitpid(pid, &status, 0);
@@ -98,12 +113,6 @@ public:
                 result.exit_code = WEXITSTATUS(status);
             }
         }
-        else
-        {
-            result.stderr_output = "Failed to fork sandbox process.";
-            result.exit_code = -1;
-        }
-
         return result;
     }
 };

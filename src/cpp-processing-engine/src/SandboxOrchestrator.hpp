@@ -2,6 +2,11 @@
 #include "IExecutionStrategy.hpp"
 #include "PythonStrategy.hpp"
 #include "CppStrategy.hpp"
+#include "RustStrategy.hpp"
+#include "NodeStrategy.hpp"
+// 🚀 NEW: Import the new strategies
+#include "CStrategy.hpp"
+#include "GoStrategy.hpp"
 #include <memory>
 #include <stdexcept>
 
@@ -21,6 +26,26 @@ public:
         {
             strategy = std::make_unique<CppStrategy>();
         }
+        // 🚀 NEW: C Routing
+        else if (language == "c")
+        {
+            strategy = std::make_unique<CStrategy>();
+        }
+        // 🚀 NEW: Golang Routing
+        else if (language == "go" || language == "golang")
+        {
+            strategy = std::make_unique<GoStrategy>();
+        }
+        // 🚀 NEW: Golang Routing
+        else if (language == "node" || language == "npm" || language == "nodejs" || language == "javascript")
+        {
+            strategy = std::make_unique<NodeStrategy>();
+        }
+        // 🚀 NEW: Golang Routing
+        else if (language == "rust" || language == "rustc")
+        {
+            strategy = std::make_unique<RustStrategy>();
+        }
         else
         {
             throw std::invalid_argument("Unsupported runtime environment: " + language);
@@ -33,13 +58,16 @@ public:
             throw std::runtime_error("Strategy not set.");
 
         std::string compile_errors;
-        bool compiled = strategy->compile(source_code, compile_errors); // 👈 Two-Phase Call
+        // Phase 1: Compile
+        bool compiled = strategy->compile(source_code, compile_errors);
 
         if (!compiled)
         {
-            // Compilation fail korle immediate return koro
+            // Immediate return if compiler (gcc/go/g++) fails
             return {-1, "", compile_errors, 0.0, false, true};
         }
+
+        // Phase 2: Execute (Orchestrator asks the strategy HOW to run itself)
         return strategy->execute(source_code, stdin_data, 5000);
     }
 };

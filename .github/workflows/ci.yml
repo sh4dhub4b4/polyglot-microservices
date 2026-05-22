@@ -2,12 +2,12 @@ name: ECI Platform CI/CD Auto-Build
 
 on:
   push:
-    branches: [ "main", "master" ] # Master ba main branch-e push korlei trigger hobe
+    branches: ["main", "master"] # Master ba main branch-e push korlei trigger hobe
 
 env:
   REGISTRY: ghcr.io
   # Converts your github username/repo into lowercase automatically
-  IMAGE_BASE: ghcr.io/${{ github.repository }} 
+  IMAGE_BASE: ghcr.io/${{ github.repository }}
 
 jobs:
   build-and-push-images:
@@ -26,13 +26,14 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           # GitHub nijeei ei token ta dey, tomar kono password set korte hobe na!
-          password: ${{ secrets.GITHUB_TOKEN }} 
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🐍 Build & Push Python Engine
         uses: docker/build-push-action@v5
         with:
           context: src/cpp-processing-engine/
-          file: src/cpp-processing-engine/Dockerfile.python
+          file: src/cpp-processing-engine/Dockerfile.engine
+          target: python-engine
           push: true
           tags: |
             ${{ env.IMAGE_BASE }}/eci-python-engine:latest
@@ -42,7 +43,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: src/cpp-processing-engine/
-          file: src/cpp-processing-engine/Dockerfile.cpp
+          file: src/cpp-processing-engine/Dockerfile.engine
+          target: cpp-engine
           push: true
           tags: |
             ${{ env.IMAGE_BASE }}/eci-cpp-engine:latest

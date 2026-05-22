@@ -1,0 +1,79 @@
+# ==========================================
+# STAGE 1: Shared Builder (Built ONLY ONCE!)
+# ==========================================
+FROM ubuntu:22.04 AS builder
+
+# Combine RUN commands and clean apt cache in same layer
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    g++ \
+    gcc \
+    golang-go \
+    libseccomp-dev \
+    make \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY src/ ./src/
+
+# 🚀 FIX: Removed -march=native for Cloud CPU compatibility (Avoids SIGILL crashes)
+RUN g++ -O3 -flto -std=c++17 \
+    src/main.cpp -o engine_binary \
+    -pthread -lseccomp \
+    && strip engine_binary  # Brilliant addition to reduce binary size
+
+# ==========================================
+# STAGE 2: Python Runtime Target
+# ==========================================
+FROM ubuntu:22.04 AS python-engine
+
+# Install only runtime essentials (libseccomp2 replaces libseccomp-dev)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python3 \
+    nodejs \
+    npm \
+    libseccomp2 \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3 /usr/bin/python
+
+# Create isolated user for the child sandbox
+RUN groupadd -r -g 10002 sandboxuser && \
+    useradd -r -u 10002 -g 10002 -m -d /app sandboxuser
+
+WORKDIR /app
+COPY --from=builder /build/engine_binary .
+
+# 🚀 FIX: Commented out USER sandboxuser to preserve Hypervisor/Sandbox Isolation!
+# The parent API runs as root, child forks drop to sandboxuser via SecurityContainer.hpp
+# USER sandboxuser
+EXPOSE 8080
+CMD ["./engine_binary"]
+
+# ==========================================
+# STAGE 3: C/C++/Go Runtime Target (Consolidated)
+# ==========================================
+FROM ubuntu:22.04 AS cpp-engine
+
+# Install runtime compilers for student code + runtime libs
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    g++ \
+    gcc \
+    golang-go \
+    rustc \
+    cargo \
+    libseccomp2 \
+    make \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r -g 10002 sandboxuser && \
+    useradd -r -u 10002 -g 10002 -m -d /app sandboxuser
+
+WORKDIR /app
+COPY --from=builder /build/engine_binary .
+
+# 🚀 FIX: Same here, hypervisor stays root.
+# USER sandboxuser
+EXPOSE 8080
+CMD ["./engine_binary"]

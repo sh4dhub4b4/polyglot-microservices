@@ -1,59 +1,53 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-import json
-import httpx
-import asyncio
+import os,uuid,json,asyncio
+import redis.asyncio as redis
+
 
 router = APIRouter()
 
-# Internal K8s DNS for the Orchestrator service
-ORCHESTRATOR_URL = "http://eci-orchestrator.eci-system.svc.cluster.local:8000/api/v1/orchestrate"
+# 🚀 HYBRID CLOUD: Use local redis if testing locally, otherwise use K8s internal DNS
+REDIS_HOST = os.getenv("REDIS_HOST", "redis-svc.eci-system.svc.cluster.local")
+redis_client = redis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
 
 @router.websocket("/ws/execute")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    pubsub = None
+    task_id = str(uuid.uuid4()) # Unique ID for this specific execution request
+    
     try:
         data = await websocket.receive_text()
         payload = json.loads(data)
+        
+        # Add Task ID to the payload so the Orchestrator knows where to send updates back
+        payload["task_id"] = task_id
 
-        # Using httpx for async HTTP requests to the Orchestrator
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            
-            # Phase 1: Provisioning
-            await websocket.send_json({"status": "provisioning", "message": "Allocating secure K8s cluster resources..."})
-            
-            prov_res = await client.post(f"{ORCHESTRATOR_URL}/provision", json={
-                "student_id": payload["student_id"],
-                "course_code": payload["course_code"],
-                "env_type": payload["language"]
-            })
-            
-            if prov_res.status_code != 200:
-                await websocket.send_json({"status": "error", "message": f"Provisioning failed: {prov_res.text}"})
-                return
+        # 🚀 Step A: Subscribe to this task's specific live update channel BEFORE queuing
+        pubsub = redis_client.pubsub()
+        await pubsub.subscribe(f"task_status_{task_id}")
+        
+        # Step B: Let frontend know it's in the queue (New Async State)
+        await websocket.send_json({"status": "queued", "message": "Request queued securely. Waiting for cluster resources..."})
+        
+        # 🚀 Step C: Push the task to Redis Queue (Orchestrator will pop this)
+        await redis_client.rpush("execution_queue", json.dumps(payload)) # type: ignore
+        
+        # 🚀 Step D: Listen for live stream updates from Orchestrator via Pub/Sub
+        async for message in pubsub.listen():
+            if message["type"] == "message":
+                update = json.loads(message["data"])
                 
-            prov_data = prov_res.json()
-            pod_name = prov_data.get("pod_name")
-
-            # Phase 2: Execution
-            await websocket.send_json({"status": "executing", "message": f"Sandbox [{pod_name}] is ready! Injecting payload..."})
-            
-            exec_res = await client.post(f"{ORCHESTRATOR_URL}/execute", json={
-                "pod_name": pod_name,
-                "source_code": payload["source_code"],
-                "stdin_data": payload.get("stdin_data", ""),
-                "env_type":payload["language"]
-            })
-            
-            if exec_res.status_code != 200:
-                await websocket.send_json({"status": "error", "message": f"Execution failed: {exec_res.text}"})
-                return
-
-            # Phase 3: Completed
-            result = exec_res.json()
-            result["status"] = "completed"
-            await websocket.send_json(result)
+                # Forward the EXACT SAME JSON format to the frontend/test-script
+                await websocket.send_json(update)
+                
+                # Break the loop and close if execution is finished or failed
+                if update.get("status") in ["completed", "error"]:
+                    break
 
     except WebSocketDisconnect:
-        print("Client disconnected.")
-    except Exception as e:
-        await websocket.send_json({"status": "error", "message": str(e)})
+        print("Client disconnected")
+    finally:
+        # Cleanup: Unsubscribe from the channel to save Redis memory
+        if pubsub:
+            await pubsub.unsubscribe(f"task_status_{task_id}")
+            await pubsub.close()

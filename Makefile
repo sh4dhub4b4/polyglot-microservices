@@ -13,12 +13,23 @@ init:
 	@kubectl create namespace eci-sandboxes --dry-run=client -o yaml | kubectl apply -f -
 	@if [ -d "k8s" ]; then kubectl apply -f k8s/; fi
 
-build-local:
-	@echo "📦 [LOCAL] Building images with unique tag: v$(TAG)..."
-	docker build -t eci-python-engine:v$(TAG) -f src/cpp-processing-engine/Dockerfile.python src/cpp-processing-engine/
-	docker build -t eci-cpp-engine:v$(TAG) -f src/cpp-processing-engine/Dockerfile.cpp src/cpp-processing-engine/
+# --- Individual Build Targets for Parallel Execution ---
+build-python:
+	docker build --target python-engine -t eci-python-engine:v$(TAG) -f src/cpp-processing-engine/Dockerfile.engine src/cpp-processing-engine/
+
+build-cpp:
+	docker build --target cpp-engine -t eci-cpp-engine:v$(TAG) -f src/cpp-processing-engine/Dockerfile.engine src/cpp-processing-engine/
+
+build-orch:
 	docker build -t eci-orchestrator:v$(TAG) -f src/environment-orchestrator/Dockerfile src/environment-orchestrator/
+
+build-gw:
 	docker build -t eci-gateway:v$(TAG) -f src/api-gateway/Dockerfile src/api-gateway/
+
+# --- Main Local Build Command ---
+build-local:
+	@echo "📦 [LOCAL] Building images in PARALLEL with unique tag: v$(TAG)..."
+	$(MAKE) -j 4 build-python build-cpp build-orch build-gw TAG=$(TAG)
 
 clean:
 	@echo "🧹 Cleaning old sandboxes..."
@@ -31,6 +42,12 @@ deploy-local: init
 	kubectl set env deployment/eci-orchestrator CPP_ENGINE_TAG=v$(TAG) IMAGE_REGISTRY="" -n eci-system
 	kubectl rollout status deployment/eci-gateway -n eci-system
 	kubectl rollout status deployment/eci-orchestrator -n eci-system
+	kubectl set image daemonset/sandbox-image-prepuller cpp-prepuller=eci-cpp-engine:v$(TAG) -n eci-sandboxes
+	kubectl set image daemonset/sandbox-image-prepuller python-prepuller=eci-python-engine:v$(TAG) -n eci-sandboxes
+	kubectl set image deployment/prewarmed-cpp-engine secure-engine=eci-cpp-engine:v$(TAG) -n eci-sandboxes
+	kubectl set image deployment/prewarmed-python-engine secure-engine=eci-python-engine:v$(TAG) -n eci-sandboxes
+	kubectl rollout status deployment/prewarmed-cpp-engine -n eci-sandboxes
+	kubectl rollout status deployment/prewarmed-python-engine -n eci-sandboxes
 
 deploy-cloud: init
 	@echo "☁️ [CLOUD] Injecting GHCR Images to K8s..."
@@ -39,6 +56,12 @@ deploy-cloud: init
 	kubectl set env deployment/eci-orchestrator CPP_ENGINE_TAG=latest IMAGE_REGISTRY="$(REGISTRY)" -n eci-system
 	kubectl rollout status deployment/eci-gateway -n eci-system
 	kubectl rollout status deployment/eci-orchestrator -n eci-system
+	kubectl set image daemonset/sandbox-image-prepuller cpp-prepuller=$(REGISTRY)/eci-cpp-engine:latest -n eci-sandboxes
+	kubectl set image daemonset/sandbox-image-prepuller python-prepuller=$(REGISTRY)/eci-python-engine:latest -n eci-sandboxes
+	kubectl set image deployment/prewarmed-cpp-engine secure-engine=$(REGISTRY)/eci-cpp-engine:latest -n eci-sandboxes
+	kubectl set image deployment/prewarmed-python-engine secure-engine=$(REGISTRY)/eci-python-engine:latest -n eci-sandboxes
+	kubectl rollout status deployment/prewarmed-cpp-engine -n eci-sandboxes
+	kubectl rollout status deployment/prewarmed-python-engine -n eci-sandboxes
 
 # 🚀 The Master Hybrid Command
 all:

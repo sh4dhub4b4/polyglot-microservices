@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prewarmed-cpp-engine
+  namespace: eci-sandboxes
+  labels:
+    app: pre-warmed-sandbox
+    env_type: cpp
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: pre-warmed-sandbox
+      env_type: cpp
+  template:
+    metadata:
+      labels:
+        app: pre-warmed-sandbox
+        env_type: cpp
+    spec:
+      containers:
+        - name: secure-engine
+          image: eci-cpp-engine:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "20m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          volumeMounts:
+            - mountPath: /tmp
+              name: ram-disk
+      volumes:
+        - name: ram-disk
+          emptyDir:
+            medium: Memory
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prewarmed-python-engine
+  namespace: eci-sandboxes
+  labels:
+    app: pre-warmed-sandbox
+    env_type: python
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: pre-warmed-sandbox
+      env_type: python
+  template:
+    metadata:
+      labels:
+        app: pre-warmed-sandbox
+        env_type: python
+    spec:
+      containers:
+        - name: secure-engine
+          image: eci-python-engine:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "20m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          volumeMounts:
+            - mountPath: /tmp
+              name: ram-disk
+      volumes:
+        - name: ram-disk
+          emptyDir:
+            medium: Memory

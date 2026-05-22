@@ -26,7 +26,7 @@ public:
         struct rlimit rl;
 
         // 1. Limit Memory (RAM + Swap)
-        rl.rlim_cur = rl.rlim_max = MAX_MEMORY_MB * 1024 * 1024;
+        rl.rlim_cur = rl.rlim_max = (MAX_MEMORY_MB + 256) * 1024 * 1024;
         if (setrlimit(RLIMIT_AS, &rl) != 0)
             throw std::runtime_error("Failed to limit Memory");
 

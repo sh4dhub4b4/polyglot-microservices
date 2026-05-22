@@ -216,3 +216,12 @@ in one container.
 [3]: https://github.com/utensils/docker-opengl?utm_source=chatgpt.com "GitHub - utensils/docker-opengl: Multi-Arch Docker - Mesa 3D OpenGL Software Rendering (Gallium) - LLVMpipe, and OpenSWR Drivers"
 [4]: https://hub.docker.com/search?q=arduino&type=image&utm_source=chatgpt.com "Explore Docker's Container Image Repository | Docker Hub"
 }
+
+keywords:
+Resource Starvation
+Stale Pod Syndrome
+Focus on the primitives, the tools will follow.
+hacker student jodi C++ e system("killall engine_binary"); lekhe, tahole amader master API server shut down hoye jabe! Eitake bole "Process Isolation Break".
+Observability & Artifact Persistencer
+Just-in-Time" কম্পাইলেশন
+প্রিভিউড বা ইনস্ট্যান্টিয়েটেড কনটেইনার
