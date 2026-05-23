@@ -44,11 +44,33 @@ jobs:
         with:
           context: src/cpp-processing-engine/
           file: src/cpp-processing-engine/Dockerfile.engine
-          target: cpp-engine
+          target: native-engine
           push: true
           tags: |
             ${{ env.IMAGE_BASE }}/eci-cpp-engine:latest
             ${{ env.IMAGE_BASE }}/eci-cpp-engine:${{ github.sha }}
+
+      - name: ☕ Build & Push JVM Engine
+        uses: docker/build-push-action@v5
+        with:
+          context: src/cpp-processing-engine/
+          file: src/cpp-processing-engine/Dockerfile.engine
+          target: jvm-engine
+          push: true
+          tags: |
+            ${{ env.IMAGE_BASE }}/eci-jvm-engine:latest
+            ${{ env.IMAGE_BASE }}/eci-jvm-engine:${{ github.sha }}
+
+      - name: 🎯 Build & Push .NET Engine
+        uses: docker/build-push-action@v5
+        with:
+          context: src/cpp-processing-engine/
+          file: src/cpp-processing-engine/Dockerfile.engine
+          target: dotnet-engine
+          push: true
+          tags: |
+            ${{ env.IMAGE_BASE }}/eci-dotnet-engine:latest
+            ${{ env.IMAGE_BASE }}/eci-dotnet-engine:${{ github.sha }}
 
       - name: 🧠 Build & Push Orchestrator
         uses: docker/build-push-action@v5
