@@ -1,5 +1,7 @@
 #pragma once
 #include "IExecutionStrategy.hpp"
+#include "JavaStrategy.hpp"
+#include "CSharpStrategy.hpp"
 #include "PythonStrategy.hpp"
 #include "CppStrategy.hpp"
 #include "RustStrategy.hpp"
@@ -25,6 +27,15 @@ public:
         else if (language == "cpp" || language == "c++")
         {
             strategy = std::make_unique<CppStrategy>();
+        } // 🚀 NEW: JVM Routing
+        else if (language == "java" || language == "kotlin")
+        {
+            strategy = std::make_unique<JavaStrategy>();
+        }
+        // 🚀 NEW: .NET Routing
+        else if (language == "csharp" || language == "c#")
+        {
+            strategy = std::make_unique<CSharpStrategy>();
         }
         // 🚀 NEW: C Routing
         else if (language == "c")

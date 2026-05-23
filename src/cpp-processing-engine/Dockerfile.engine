@@ -53,7 +53,7 @@ CMD ["./engine_binary"]
 # ==========================================
 # STAGE 3: C/C++/Go Runtime Target (Consolidated)
 # ==========================================
-FROM ubuntu:22.04 AS cpp-engine
+FROM ubuntu:22.04 AS native-engine 
 
 # Install runtime compilers for student code + runtime libs
 RUN apt-get update && \
@@ -75,5 +75,42 @@ COPY --from=builder /build/engine_binary .
 
 # 🚀 FIX: Same here, hypervisor stays root.
 # USER sandboxuser
+EXPOSE 8080
+CMD ["./engine_binary"]
+
+# ==========================================
+# STAGE 4: JVM Runtime Target (Java/Kotlin)
+# ==========================================
+FROM ubuntu:22.04 AS jvm-engine
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    openjdk-17-jdk-headless \
+    libseccomp2 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r -g 10002 sandboxuser && \
+    useradd -r -u 10002 -g 10002 -m -d /app sandboxuser
+
+WORKDIR /app
+COPY --from=builder /build/engine_binary .
+EXPOSE 8080
+CMD ["./engine_binary"]
+
+# ==========================================
+# STAGE 5: .NET Runtime Target (C#)
+# ==========================================
+FROM ubuntu:22.04 AS dotnet-engine
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install -y --no-install-recommends \
+    mono-mcs mono-runtime libseccomp2 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r -g 10002 sandboxuser && \
+    useradd -r -u 10002 -g 10002 -m -d /app sandboxuser
+
+WORKDIR /app
+COPY --from=builder /build/engine_binary .
 EXPOSE 8080
 CMD ["./engine_binary"]

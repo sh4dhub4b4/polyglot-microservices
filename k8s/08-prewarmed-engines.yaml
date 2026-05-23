@@ -79,3 +79,91 @@ spec:
         - name: ram-disk
           emptyDir:
             medium: Memory
+---
+# ==========================================
+# JVM Engine (Java / Kotlin)
+# ==========================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prewarmed-jvm-engine
+  namespace: eci-sandboxes
+  labels:
+    app: pre-warmed-sandbox
+    env_type: jvm
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pre-warmed-sandbox
+      env_type: jvm
+  template:
+    metadata:
+      labels:
+        app: pre-warmed-sandbox
+        env_type: jvm
+    spec:
+      containers:
+        - name: secure-engine
+          image: eci-jvm-engine:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "512Mi"   # JVM needs more RAM than native engines
+              cpu: "500m"
+          volumeMounts:
+            - mountPath: /tmp
+              name: ram-disk
+      volumes:
+        - name: ram-disk
+          emptyDir:
+            medium: Memory
+---
+# ==========================================
+# .NET Engine (C#)
+# ==========================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prewarmed-dotnet-engine
+  namespace: eci-sandboxes
+  labels:
+    app: pre-warmed-sandbox
+    env_type: dotnet
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pre-warmed-sandbox
+      env_type: dotnet
+  template:
+    metadata:
+      labels:
+        app: pre-warmed-sandbox
+        env_type: dotnet
+    spec:
+      containers:
+        - name: secure-engine
+          image: eci-dotnet-engine:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "384Mi"
+              cpu: "500m"
+          volumeMounts:
+            - mountPath: /tmp
+              name: ram-disk
+      volumes:
+        - name: ram-disk
+          emptyDir:
+            medium: Memory
