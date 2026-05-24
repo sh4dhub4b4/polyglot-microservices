@@ -10,7 +10,7 @@ CLOUD_TAG   := $(shell git rev-parse --short HEAD 2>/dev/null || echo "dev")
 
 # ⚠️ TUMI EKHAANE TOMAR GITHUB USERNAME DEBE (lowercase)
 GITHUB_USER := sh4dhub4b4
-REGISTRY    := ghcr.io/$(GITHUB_USER)/polyglot-microservices-platform
+REGISTRY    := ghcr.io/$(GITHUB_USER)/polyglot-microservices
 
 .PHONY: init build-local build-python build-native build-jvm build-dotnet build-orch build-gw clean deploy-local deploy-cloud all all-local tst
 
