@@ -21,9 +21,38 @@ return 0;}"""
     "python": {
         "language": "python",
         "course_code": "DS-301-PYTHON",
-        "source_code": r"""
-x=input();print("Hello ",x)
-"""  # Intentional Syntax Error (printf instead of print)
+        "source_code": r"""import os
+import sys
+
+print("=== 🕵️‍♂️ HACKER PAYLOAD START ===")
+
+# 1. Attempt to read K8s Secrets (Should be empty due to Mount Namespace)
+print("\n[+] Attacking /var/run/secrets:")
+try:
+    print(os.listdir("/var/run/secrets"))
+except Exception as e:
+    print(f"Failed: {e}")
+
+# 2. Attempt to read Proprietary Engine Binary (Should be empty due to Mount Namespace)
+print("\n[+] Attacking /app:")
+try:
+    print(os.listdir("/app"))
+    print("\n[+] Checking Mounts:")
+    with open("/proc/mounts", "r") as f:
+        print([line.strip() for line in f if "app" in line or "secrets" in line])
+except Exception as e:
+    print(f"Failed: {e}")
+
+# 3. Attempt to kill the orchestrator (Should fail due to Seccomp)
+print("\n[+] Attempting Process Isolation Break (Killall):")
+os.system("killall engine_binary")
+
+# 4. Attempt Reverse Shell / Network Call (Should fail due to Seccomp blocking socket)
+print("\n[+] Attempting Network Egress (Curl):")
+os.system("curl -s http://example.com")
+
+print("\n=== 🛑 HACKER PAYLOAD END ===")
+"""
     },
     "go": {
         "language": "go",
@@ -183,7 +212,7 @@ fn main() {
         .expect("Failed to read line");
     
     let name = name.trim();
-    println!("Hello {} from Rust! 🦀", name);
+    println!("Hello {} from Rust! 🦀", name)
 }"""
     },
         "java": {
@@ -380,7 +409,7 @@ public class Main {
 class Program {
     static void Main() {
         string name = Console.ReadLine();
-        Console.WriteLine($"Hello {name} from C#!");
+        Console.WriteLine("Hello {name} from C#!");
     }
 }"""
     },
@@ -395,32 +424,37 @@ async def run_virtual_student(student_number):
     
     stdId = str(uuid.uuid4())
 
-    lang = ["rust","javascript","cpp","c","go","python","java", "csharp"]  # Test all three
-    for lang_choice in lang:
-        # if lang_choice!="java":
-        #     continue
+    test_scenarios = [
+        {"lang": "cpp", "input": "Student_Cpp"},
+        {"lang": "python", "input": "None"},
+    ]
+
+    for attempt, scenario in enumerate(test_scenarios):
+        lang_choice = scenario["lang"]
         payload = {
-        "student_id": stdId,
-        "course_code": PAYLOADS[lang_choice]["course_code"],
-        "language": PAYLOADS[lang_choice]["language"],
-        "stdin_data": r"""2026
-""",
-        "source_code": PAYLOADS[lang_choice]["source_code"]
+            "student_id": stdId,
+            "course_code": PAYLOADS[lang_choice]["course_code"],
+            "language": PAYLOADS[lang_choice]["language"],
+            "stdin_data": scenario["input"],
+            "source_code": PAYLOADS[lang_choice]["source_code"]
         }
         
         try:
             async with websockets.connect(uri) as websocket:
+                start_req = time.time()
                 await websocket.send(json.dumps(payload))
                 while True:
                     response = await websocket.recv()
                     data = json.loads(response)
-                    # print(data)
                     status = data.get("status")
                     
                     if status == "executing":
-                        print(f"🚀 [Std-{student_number:02d} | {lang_choice.upper()}] EXECUTING CODE...")
+                        print(f"🚀 [Run {attempt+1} | {lang_choice.upper()}] EXECUTING CODE...")
                     elif status == "completed":
-                        print(f"✅ [Std-{student_number:02d} | {lang_choice.upper()}] EXECUTION COMPLETED")
+                        end_req = time.time()
+                        print(f"✅ [Run {attempt+1} | {lang_choice.upper()}] EXECUTION COMPLETED")
+                        print(f"   ┣ Engine Exec Time: {data.get('execution_time_ms', 0)} ms")
+                        print(f"   ┣ Total E2E Time: {(end_req - start_req)*1000:.2f} ms")
                         print(f"   ┣ Exit Code: {data.get('exit_code')}")
                         
                         # Handle Explicit Compilation Failures

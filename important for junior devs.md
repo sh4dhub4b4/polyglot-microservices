@@ -69,27 +69,26 @@ RUN apt-get update && apt-get install -y default-jdk
 
 #### **Step 2: Create the Language Strategy (C++)**
 
-We must teach the C++ Sandbox how to compile and run the new language.
+Thanks to the **Template Method Pattern**, we have hidden all the complex OS-level code (`fork`, `execvp`, POSIX pipes, and security restrictions) inside `BaseStrategy.hpp`. You only need to provide the paths and commands!
 
 * **File to touch:** `src/cpp-processing-engine/src/JavaStrategy.hpp` (New File)
-* **Action:** Implement the `IExecutionStrategy` interface. Tell it how to write the code to a file, compile it, and run it safely.
+* **Action:** Inherit from `BaseStrategy` and implement the 3 protected configuration methods.
 ```cpp
 #pragma once
-#include "IExecutionStrategy.hpp"
-#include "SecurityContainer.hpp"
-// ... basic includes ...
+#include "BaseStrategy.hpp"
 
-class JavaStrategy : public IExecutionStrategy {
-public:
-    ExecutionResult execute(const std::string& source_code, int timeout_ms) override {
-        // 1. Write source_code to "Main.java"
-        // 2. fork() a child process
-        // 3. In the child: Call SecurityContainer::enforce_limits()
-        // 4. In the child: Run `javac Main.java && java Main`
-        // 5. In the parent: Wait and return the output.
+class JavaStrategy : public BaseStrategy {
+protected:
+    std::string get_source_file_path() const override { return "/tmp/Main.java"; }
+    
+    std::vector<std::string> get_compile_command() const override {
+        return {"javac", "/tmp/Main.java"};
+    }
+    
+    std::vector<std::string> get_execute_command() const override {
+        return {"java", "-Xmx128m", "-Xms32m", "-XX:+UseSerialGC", "-cp", "/tmp", "Main"};
     }
 };
-
 ```
 
 

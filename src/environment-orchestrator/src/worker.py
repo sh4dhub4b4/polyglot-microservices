@@ -2,13 +2,22 @@ import os
 import json
 import time
 import redis
-from k8s_manager import K8sEnvironmentManager
+
+# Clean Architecture Imports
+from adapters.redis_lock_adapter import RedisLockAdapter
+from adapters.k8s_provisioner_adapter import K8sProvisionerAdapter
+from adapters.http_executor_adapter import HttpExecutorAdapter
+from services.execution_service import ExecutionService
 
 # SRE Note: Worker will use synchronous Redis to match k8s_manager's synchronous flow
 REDIS_HOST = os.getenv("REDIS_HOST", "redis-svc.eci-system.svc.cluster.local")
 redis_client = redis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
 
-k8s_manager = K8sEnvironmentManager()
+# Dependency Injection setup
+lock_manager = RedisLockAdapter()
+provisioner = K8sProvisionerAdapter(lock_manager=lock_manager)
+engine_client = HttpExecutorAdapter()
+k8s_manager = ExecutionService(provisioner=provisioner, lock_manager=lock_manager, engine_client=engine_client)
 
 def publish_status(task_id: str, status: str, message: str, extra: dict = None):
     """Helper function to broadcast messages back to the API Gateway via Pub/Sub"""

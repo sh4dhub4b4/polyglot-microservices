@@ -1,11 +1,21 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uuid
-from k8s_manager import K8sEnvironmentManager
 from typing import Optional
 
+# Clean Architecture Imports
+from adapters.redis_lock_adapter import RedisLockAdapter
+from adapters.k8s_provisioner_adapter import K8sProvisionerAdapter
+from adapters.http_executor_adapter import HttpExecutorAdapter
+from services.execution_service import ExecutionService
+
 app = FastAPI(title="ECI Environment Orchestrator")
-k8s_manager = K8sEnvironmentManager()
+
+# Dependency Injection setup
+lock_manager = RedisLockAdapter()
+provisioner = K8sProvisionerAdapter(lock_manager=lock_manager)
+engine_client = HttpExecutorAdapter()
+k8s_manager = ExecutionService(provisioner=provisioner, lock_manager=lock_manager, engine_client=engine_client)
 
 # --- Pydantic Models ---
 class ProvisionRequest(BaseModel):

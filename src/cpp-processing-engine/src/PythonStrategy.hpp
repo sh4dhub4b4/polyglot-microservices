@@ -1,109 +1,14 @@
 #pragma once
-#include "IExecutionStrategy.hpp"
-#include "SecurityContainer.hpp"
-#include <unistd.h>
-#include <sys/wait.h>
-#include <string.h>
-#include <fcntl.h> // 🚀 NEW: Required for POSIX open
-#include <iostream>
+#include "BaseStrategy.hpp"
 
-class PythonStrategy : public IExecutionStrategy
+class PythonStrategy : public BaseStrategy
 {
-public:
-    // Python does not have a separate compile step
-    bool compile(const std::string &source_code, std::string &compile_errors) override
-    {
-        return true;
-    }
-
-    ExecutionResult execute(const std::string &source_code, const std::string &stdin_data, int timeout_ms) override
-    {
-        // 👈 Update: initialize with false for compilation_failed
-        ExecutionResult result = {0, "", "", 0.0, false, false};
-
-        // 1. Write the source code
-        std::string filename = "/tmp/sandbox_exec.py";
-        std::ofstream out(filename);
-        out << source_code;
-        out.close();
-
-        // 2. Write the standard input data BEFORE forking (Security Best Practice)
-        std::ofstream in("/tmp/in.txt");
-        in << stdin_data;
-        in.close();
-
-        std::remove("/tmp/out.txt");
-        std::remove("/tmp/err.txt");
-
-        pid_t pid = fork();
-
-        if (pid == 0) // Child Process
-        {
-            try
-            {
-                // 🚀 SRE FIX: Raw POSIX Descriptor Routing (No more swallowed outputs)
-                int fd_in = open("/tmp/in.txt", O_RDONLY);
-                int fd_out = open("/tmp/out.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
-                int fd_err = open("/tmp/err.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
-
-                dup2(fd_in, STDIN_FILENO);
-                dup2(fd_out, STDOUT_FILENO);
-                dup2(fd_err, STDERR_FILENO);
-
-                close(fd_in);
-                close(fd_out);
-                close(fd_err);
-
-                // 4. Lock down the container
-                SecurityContainer::enforce_limits();
-
-                // 5. Execute using OS path lookup (-u forces unbuffered I/O)
-                execlp("python3", "python3", "-u", filename.c_str(), nullptr);
-
-                std::cerr << "[System] Fatal: python3 interpreter failed to launch. Reason: " << strerror(errno) << std::endl;
-                exit(1);
-            }
-            catch (const std::exception &e)
-            {
-                // Catch any kernel or SecurityContainer limits
-                std::cerr << "[Security Kernel] " << e.what() << std::endl;
-                exit(1);
-            }
-            catch (...)
-            {
-                std::cerr << "[System] Unknown fatal crash." << std::endl;
-                exit(1);
-            }
-        }
-        else if (pid > 0) // Parent Process
-        {
-            int status;
-            waitpid(pid, &status, 0);
-
-            result.stdout_output = read_file("/tmp/out.txt");
-            result.stderr_output = read_file("/tmp/err.txt");
-
-            if (WIFSIGNALED(status))
-            {
-                result.exit_code = 128 + WTERMSIG(status);
-                result.stderr_output += "\n[System] Process crashed with signal " + std::to_string(WTERMSIG(status));
-                if (WTERMSIG(status) == SIGKILL)
-                {
-                    result.memory_limit_exceeded = true;
-                    result.stderr_output += " (Resource Limit Reached)";
-                }
-            }
-            else
-            {
-                result.exit_code = WEXITSTATUS(status);
-            }
-        }
-        else
-        {
-            result.stderr_output = "Failed to fork sandbox process.";
-            result.exit_code = -1;
-        }
-
-        return result;
+protected:
+    std::string get_source_file_path() const override { return "/tmp/sandbox_exec.py"; }
+    
+    std::vector<std::string> get_compile_command() const override { return {}; } // No compilation
+    
+    std::vector<std::string> get_execute_command() const override {
+        return {"python3", "-u", "/tmp/sandbox_exec.py"};
     }
 };

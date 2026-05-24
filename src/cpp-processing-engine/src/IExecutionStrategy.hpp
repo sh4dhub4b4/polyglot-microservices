@@ -76,4 +76,7 @@ public:
 
     // Stage 2: Executes the binary or script
     virtual ExecutionResult execute(const std::string &source_code, const std::string &stdin_data, int timeout_ms) = 0;
+
+    // Stage 3 (Optional): Used by BaseStrategy to cache compiled binaries to RAM-Disk
+    virtual std::string get_compiled_binary_path() const { return ""; }
 };

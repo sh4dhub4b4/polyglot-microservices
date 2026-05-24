@@ -7,7 +7,7 @@ metadata:
     app: pre-warmed-sandbox
     env_type: cpp
 spec:
-  replicas: 5
+  replicas: 3
   selector:
     matchLabels:
       app: pre-warmed-sandbox
@@ -22,8 +22,18 @@ spec:
         - name: secure-engine
           image: eci-cpp-engine:latest
           imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add: ["SYS_ADMIN"]
           ports:
             - containerPort: 8080
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
           resources:
             requests:
               memory: "64Mi"
@@ -48,7 +58,7 @@ metadata:
     app: pre-warmed-sandbox
     env_type: python
 spec:
-  replicas: 5
+  replicas: 3
   selector:
     matchLabels:
       app: pre-warmed-sandbox
@@ -63,8 +73,18 @@ spec:
         - name: secure-engine
           image: eci-python-engine:latest
           imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add: ["SYS_ADMIN"]
           ports:
             - containerPort: 8080
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
           resources:
             requests:
               memory: "64Mi"
@@ -92,7 +112,7 @@ metadata:
     app: pre-warmed-sandbox
     env_type: jvm
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: pre-warmed-sandbox
@@ -107,8 +127,18 @@ spec:
         - name: secure-engine
           image: eci-jvm-engine:latest
           imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add: ["SYS_ADMIN"]
           ports:
             - containerPort: 8080
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
           resources:
             requests:
               memory: "128Mi"
@@ -136,7 +166,7 @@ metadata:
     app: pre-warmed-sandbox
     env_type: dotnet
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: pre-warmed-sandbox
@@ -151,8 +181,18 @@ spec:
         - name: secure-engine
           image: eci-dotnet-engine:latest
           imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add: ["SYS_ADMIN"]
           ports:
             - containerPort: 8080
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
           resources:
             requests:
               memory: "128Mi"
