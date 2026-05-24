@@ -6,7 +6,7 @@
 # ============================================================
 TAG_FILE    := .build_tag
 LOCAL_TAG   := $(shell cat $(TAG_FILE) 2>/dev/null || echo "none")
-CLOUD_TAG   := $(shell git rev-parse --short HEAD 2>/dev/null || echo "dev")
+CLOUD_TAG   := $(shell git rev-parse HEAD 2>/dev/null || echo "dev")
 
 # ⚠️ TUMI EKHAANE TOMAR GITHUB USERNAME DEBE (lowercase)
 GITHUB_USER := sh4dhub4b4

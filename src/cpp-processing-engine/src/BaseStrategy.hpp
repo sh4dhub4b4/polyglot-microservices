@@ -9,7 +9,7 @@
 #include <chrono>
 #include <vector>
 #include <stdlib.h>
-
+#include <filesystem>
 class BaseStrategy : public IExecutionStrategy
 {
 protected:
@@ -36,8 +36,7 @@ public:
             
             if (access(cache_path.c_str(), F_OK) == 0) {
                 // ⚡ JIT CACHE HIT
-                std::string copy_cmd = "cp " + cache_path + " " + binary_path;
-                system(copy_cmd.c_str());
+                std::filesystem::copy_file(cache_path, binary_path, std::filesystem::copy_options::overwrite_existing);
                 std::cout << "⚡ [JIT CACHE HIT] Skipped Compilation." << std::endl;
                 return true;
             }
@@ -81,8 +80,7 @@ public:
             }
             
             if (!binary_path.empty()) {
-                std::string save_cmd = "cp " + binary_path + " " + cache_path;
-                system(save_cmd.c_str());
+                std::filesystem::copy_file(binary_path, cache_path, std::filesystem::copy_options::overwrite_existing);
                 std::cout << "💾 [JIT CACHE SAVED] Binary cached in RAM-Disk." << std::endl;
             }
         }
