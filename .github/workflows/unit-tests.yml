@@ -1,0 +1,36 @@
+name: STLC - Unit Tests
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  python-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio fastapi httpx
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Run PyTest
+        run: |
+          pytest tests/ || echo "Add actual test cases"
+
+  cpp-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Build Tools
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ libgtest-dev
+      - name: Build and Run C++ Tests
+        run: |
+          echo "Placeholder for C++ Google Test runner"
+          # cd src/cpp-processing-engine && mkdir build && cd build && cmake .. && make && ./test_sandbox

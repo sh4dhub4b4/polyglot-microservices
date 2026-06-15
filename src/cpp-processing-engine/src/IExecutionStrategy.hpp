@@ -20,7 +20,7 @@ inline std::string read_file(const std::string &path)
 }
 
 // 🚀 THE MAGIC: Mother-level system call interceptor
-inline pid_t smart_waitpid(pid_t pid, int *status, int options)
+inline pid_t smart_waitpid(pid_t pid, int *status, int options, int timeout_ms = 15000)
 {
     // Check if the parent process is a compiler (gcc/go/g++)
     // SRE NOTE: Compilation is intensive, 5s might be too short for slow CPUs
@@ -36,8 +36,8 @@ inline pid_t smart_waitpid(pid_t pid, int *status, int options)
                            std::chrono::steady_clock::now() - start_time)
                            .count();
 
-        if (elapsed > 15000)
-        { // Universal 15-second timeout
+        if (elapsed > timeout_ms)
+        { // Configurable timeout (default 15s)
             kill(pid, SIGKILL);
             ::waitpid(pid, status, 0); // Clean up the zombie process
 
@@ -53,8 +53,7 @@ inline pid_t smart_waitpid(pid_t pid, int *status, int options)
     }
 }
 
-// 🛑 MACRO HIJACK: Forces all child files to use our smart_waitpid instead of the OS one
-#define waitpid(pid, status, options) smart_waitpid(pid, status, options)
+// SRE NOTE: Macro hijack for waitpid removed to prevent breaking ProcessPipe.hpp's WNOHANG polling.
 
 struct ExecutionResult
 {
@@ -79,4 +78,22 @@ public:
 
     // Stage 3 (Optional): Used by BaseStrategy to cache compiled binaries to RAM-Disk
     virtual std::string get_compiled_binary_path() const { return ""; }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Interactive Mode Accessors (Used by InteractiveSession)
+    // Default implementations allow strategies to work without changes.
+    // BaseStrategy overrides these to expose the protected methods.
+    // ═══════════════════════════════════════════════════════════════
+
+    // Returns the command to execute the compiled binary or interpreter
+    virtual std::vector<std::string> get_execute_command_public() const { return {}; }
+
+    // Returns the source file path the strategy expects
+    virtual std::string get_source_file_path_public() const { return ""; }
+
+    // Returns true for interpreted languages (no compilation step)
+    virtual bool is_interpreted() const { return false; }
+
+    // Returns a callable that sets up env vars in the child process
+    virtual std::function<void()> get_setup_environment_fn() const { return nullptr; }
 };

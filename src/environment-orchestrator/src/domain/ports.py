@@ -13,7 +13,7 @@ class ILockManager(ABC):
 
 class ISandboxProvisioner(ABC):
     @abstractmethod
-    def provision(self, student_id: uuid.UUID, course_code: str, env_type: str) -> Dict[str, Any]:
+    def provision(self, student_id: uuid.UUID, course_code: str, env_type: str, docker_image: str = "polyglot-cpp-engine:latest", base_cost: float = 1.0, custom_init_script: Optional[str] = None) -> Dict[str, Any]:
         """Returns dict with status, pod_name, source"""
         pass
 
@@ -23,6 +23,10 @@ class ISandboxProvisioner(ABC):
 
     @abstractmethod
     def cleanup_pod(self, pod_name: str, keep_alive_for_debug: bool = False) -> None:
+        pass
+
+    @abstractmethod
+    def extract_postmortem(self, pod_name: str) -> Dict[str, Any]:
         pass
 
 class IEngineClient(ABC):

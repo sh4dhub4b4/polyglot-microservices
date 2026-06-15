@@ -7,7 +7,7 @@ protected:
     std::string get_source_file_path() const override { return "/tmp/main.rs"; }
     
     std::vector<std::string> get_compile_command() const override {
-        return {"rustc", "-o", "/tmp/program_rust", "/tmp/main.rs"};
+        return {"sh", "-c", "export PATH=$PATH:/usr/local/cargo/bin && rustc -o /tmp/program_rust /tmp/main.rs"};
     }
     
     std::vector<std::string> get_execute_command() const override {

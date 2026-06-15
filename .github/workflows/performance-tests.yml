@@ -1,0 +1,35 @@
+name: STLC - Performance Testing
+
+on:
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+  push:
+    branches: [ "main" ]
+
+jobs:
+  k6-load-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+      
+      - name: Run k6 WebSocket & API Load Test
+        run: |
+          echo "Running k6 test script..."
+          # k6 run tests/performance/k6_websocket_test.js
+
+  locust-load-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install Locust
+        run: pip install locust
+      - name: Run Locust Test (Headless)
+        run: |
+          echo "Running Locust in headless mode..."
+          # locust -f tests/performance/locustfile.py --headless -u 1000 -r 100 --run-time 1m --host http://localhost:8000

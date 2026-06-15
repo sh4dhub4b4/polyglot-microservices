@@ -1,0 +1,51 @@
+# ==========================================
+# ECI GUI Processing Engine (Stateful VNC)
+# ==========================================
+FROM ubuntu:22.04
+
+# Prevent interactive prompts during apt installs
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+
+# Install GUI Dependencies, VNC, and Compilers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    xvfb \
+    x11vnc \
+    novnc \
+    websockify \
+    openbox \
+    python3 \
+    python3-pip \
+    python3-tk \
+    openjdk-17-jdk \
+    libgl1-mesa-dri \
+    libgl1-mesa-glx \
+    libglx-mesa0 \
+    mesa-utils \
+    g++ \
+    libglfw3-dev \
+    libglew-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install FastAPI and Uvicorn for the internal pod orchestrator
+RUN pip3 install --no-cache-dir fastapi uvicorn websockets
+
+# Create isolated user for security
+RUN groupadd -r -g 10002 sandboxuser && \
+    useradd -r -u 10002 -g 10002 -m -d /app sandboxuser
+
+WORKDIR /app
+
+# Copy the desktop startup script and the python API server
+COPY src/start_desktop.sh .
+COPY src/gui_server.py .
+
+RUN chmod +x start_desktop.sh
+
+# The container MUST run as root to manage Xvfb and drop privileges for the user code
+EXPOSE 6080
+EXPOSE 8080
+
+# Start the VNC Desktop and the API Server
+CMD ["./start_desktop.sh"]

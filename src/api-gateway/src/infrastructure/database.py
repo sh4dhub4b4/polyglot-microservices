@@ -1,11 +1,18 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# We will use SQLite for local rapid dev, easily swapped to PostgreSQL via env vars
-DATABASE_URL = "sqlite:///./platform_dev.db"
+# Default to PostgreSQL for Phase 3 Multi-tenancy LTree & UUIDv7 support
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", 
+    "postgresql://postgres:postgres@localhost:5432/polyglot"
+)
 
 engine = create_engine(
-    DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+    DATABASE_URL, 
+    pool_pre_ping=True, 
+    pool_size=10, 
+    max_overflow=20
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

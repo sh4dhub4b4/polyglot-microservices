@@ -13,6 +13,23 @@
 class BaseStrategy : public IExecutionStrategy
 {
 protected:
+    std::string base64_encode(const std::string &in) const {
+        static const std::string b = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        std::string out;
+        int val = 0, valb = -6;
+        for (unsigned char c : in) {
+            val = (val << 8) + c;
+            valb += 8;
+            while (valb >= 0) {
+                out.push_back(b[(val >> valb) & 0x3F]);
+                valb -= 6;
+            }
+        }
+        if (valb > -6) out.push_back(b[((val << 8) >> (valb + 8)) & 0x3F]);
+        while (out.size() % 4) out.push_back('=');
+        return out;
+    }
+
     virtual std::string get_source_file_path() const = 0;
     virtual std::vector<std::string> get_compile_command() const = 0;
     virtual std::vector<std::string> get_execute_command() const = 0;
@@ -21,6 +38,18 @@ protected:
     virtual void setup_environment() const {}
 
 public:
+    // ═══════════════════════════════════════════════════════════════
+    // Interactive Mode Accessors (bridge protected → public for InteractiveSession)
+    // ═══════════════════════════════════════════════════════════════
+
+    std::vector<std::string> get_execute_command_public() const override { return get_execute_command(); }
+    std::string get_source_file_path_public() const override { return get_source_file_path(); }
+    bool is_interpreted() const override { return get_compile_command().empty(); }
+    std::function<void()> get_setup_environment_fn() const override
+    {
+        return [this]() { setup_environment(); };
+    }
+
     bool compile(const std::string &source_code, std::string &compile_errors) override
     {
         auto compile_cmd = get_compile_command();
@@ -56,6 +85,13 @@ public:
             dup2(fd, STDERR_FILENO);
             close(fd);
 
+            try {
+                SecurityContainer::enforce_compiler_limits();
+            } catch (const std::exception& e) {
+                std::cout << "[Security Kernel] Compiler Sandbox Error: " << e.what() << std::endl;
+                exit(1);
+            }
+
             setup_environment();
 
             std::vector<char*> args;
@@ -66,15 +102,20 @@ public:
 
             execvp(args[0], args.data());
 
-            std::cout << "[System] Fatal: Compiler failed to launch." << std::endl;
+            std::cout << "[System] Fatal: Compiler failed to launch. errno: " << errno << " - " << strerror(errno) << std::endl;
             exit(1);
         }
         else
         {
             int status;
-            waitpid(pid, &status, 0);
-            if (WEXITSTATUS(status) != 0)
+            smart_waitpid(pid, &status, 0, 60000); // 60s for compilation
+            if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
             {
+                if (!WIFEXITED(status)) {
+                    std::ofstream err_file("/tmp/compile_err.txt", std::ios_base::app);
+                    err_file << "\n[System] Compiler process was terminated (timeout or signal).";
+                    err_file.close();
+                }
                 compile_errors = read_file("/tmp/compile_err.txt");
                 return false;
             }
@@ -136,7 +177,7 @@ public:
 
                 execvp(args[0], args.data());
 
-                std::cerr << "[System] Failed to execute the binary." << std::endl;
+                std::cerr << "[System] Failed to execute the binary. errno: " << errno << " - " << strerror(errno) << std::endl;
                 exit(1);
             }
             catch (const std::exception &e)
@@ -153,7 +194,7 @@ public:
         else if (pid > 0)
         {
             int status;
-            waitpid(pid, &status, 0);
+            smart_waitpid(pid, &status, 0, timeout_ms);
 
             result.stdout_output = read_file("/tmp/out.txt");
             result.stderr_output = read_file("/tmp/err.txt");

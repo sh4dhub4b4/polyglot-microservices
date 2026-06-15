@@ -1,0 +1,7 @@
+{
+    "pod_name": "prewarmed-wasm-engine-7c4c8779b5-6wxm9",
+    "kubernetes_logs": "Starting ECI Secure Execution Sandbox on port 8080...\n",
+    "tmp_contents": {
+        "raw_dump": "--- ls -la /tmp ---\ntotal 4\ndrwxrwxrwt 2 root root   40 Jun  4 07:07 .\ndrwxr-xr-x 1 root root 4096 Jun  4 07:08 ..\n\n--- cat /tmp/* ---\n"
+    }
+}

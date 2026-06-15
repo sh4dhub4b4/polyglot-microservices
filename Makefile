@@ -21,17 +21,35 @@ init:
 	@if [ -d "k8s" ]; then kubectl apply -f k8s/; fi
 
 # --- Individual Build Targets (called with TAG from build-local, NOT standalone) ---
-build-python:
-	docker build --target python-engine -t eci-python-engine:v$(TAG) -f src/cpp-processing-engine/Dockerfile.engine src/cpp-processing-engine/
+build-base:
+	docker build -t polyglot-base-pod:latest -f docker/base/base-pod.Dockerfile .
 
-build-native:
-	docker build --target native-engine -t eci-cpp-engine:v$(TAG) -f src/cpp-processing-engine/Dockerfile.engine src/cpp-processing-engine/
+build-python: build-base
+	docker build -t eci-python-engine:v$(TAG) -f docker/runtime/python-pod.Dockerfile .
 
-build-jvm:
-	docker build --target jvm-engine -t eci-jvm-engine:v$(TAG) -f src/cpp-processing-engine/Dockerfile.engine src/cpp-processing-engine/
+build-native: build-base
+	docker build -t eci-cpp-engine:v$(TAG) -f docker/runtime/cpp-pod.Dockerfile .
 
-build-dotnet:
-	docker build --target dotnet-engine -t eci-dotnet-engine:v$(TAG) -f src/cpp-processing-engine/Dockerfile.engine src/cpp-processing-engine/
+build-jvm: build-base
+	docker build -t eci-jvm-engine:v$(TAG) -f docker/runtime/java-pod.Dockerfile .
+
+build-dotnet: build-base
+	docker build -t eci-dotnet-engine:v$(TAG) -f docker/runtime/csharp-pod.Dockerfile .
+
+build-go: build-base
+	docker build -t eci-go-engine:v$(TAG) -f docker/runtime/go-pod.Dockerfile .
+
+build-rust: build-base
+	docker build -t eci-rust-engine:v$(TAG) -f docker/runtime/rust-pod.Dockerfile .
+
+build-node: build-base
+	docker build -t eci-node-engine:v$(TAG) -f docker/runtime/node-pod.Dockerfile .
+
+build-wasm: build-base
+	docker build -t eci-wasm-engine:v$(TAG) -f docker/runtime/wasm-pod.Dockerfile .
+
+build-gui:
+	docker build -t eci-gui-engine:v$(TAG) -f src/gui-processing-engine/Dockerfile.gui src/gui-processing-engine/
 
 build-orch:
 	docker build -t eci-orchestrator:v$(TAG) -f src/environment-orchestrator/Dockerfile src/environment-orchestrator/
@@ -43,8 +61,11 @@ build-gw:
 # deploy-local will READ from .build_tag, guaranteeing the same tag always.
 build-local:
 	$(eval BUILD_TAG := $(shell date +%s))
-	@echo "📦 [LOCAL] Building 6 images in PARALLEL | TAG=v$(BUILD_TAG)"
-	$(MAKE) -j 6 build-python build-native build-jvm build-dotnet build-orch build-gw TAG=$(BUILD_TAG)
+	@echo "📦 [LOCAL] Building images in batches to prevent IO thrashing | TAG=v$(BUILD_TAG)"
+	export DOCKER_BUILDKIT=1 && $(MAKE) build-base
+	export DOCKER_BUILDKIT=1 && $(MAKE) -j 3 build-python build-native build-jvm build-dotnet TAG=$(BUILD_TAG)
+	export DOCKER_BUILDKIT=1 && $(MAKE) -j 3 build-go build-rust build-node build-wasm build-gui TAG=$(BUILD_TAG)
+	export DOCKER_BUILDKIT=1 && $(MAKE) -j 2 build-orch build-gw TAG=$(BUILD_TAG)
 	@echo $(BUILD_TAG) > $(TAG_FILE)
 	@echo "✅ Build complete! TAG=v$(BUILD_TAG) saved to $(TAG_FILE)."
 	@echo "👉 Run 'make clean deploy-local' to deploy."
@@ -71,10 +92,24 @@ deploy-local: init
 	kubectl set image deployment/prewarmed-python-engine secure-engine=eci-python-engine:v$(DEPLOY_TAG) -n eci-sandboxes
 	kubectl set image deployment/prewarmed-jvm-engine secure-engine=eci-jvm-engine:v$(DEPLOY_TAG) -n eci-sandboxes
 	kubectl set image deployment/prewarmed-dotnet-engine secure-engine=eci-dotnet-engine:v$(DEPLOY_TAG) -n eci-sandboxes
+	kubectl set image deployment/prewarmed-go-engine secure-engine=eci-go-engine:v$(DEPLOY_TAG) -n eci-sandboxes
+	kubectl set image deployment/prewarmed-rust-engine secure-engine=eci-rust-engine:v$(DEPLOY_TAG) -n eci-sandboxes
+	kubectl set image deployment/prewarmed-node-engine secure-engine=eci-node-engine:v$(DEPLOY_TAG) -n eci-sandboxes
+	kubectl set image deployment/prewarmed-wasm-engine secure-engine=eci-wasm-engine:v$(DEPLOY_TAG) -n eci-sandboxes
+	kubectl set image deployment/prewarmed-wasm-rust-engine secure-engine=eci-rust-engine:v$(DEPLOY_TAG) -n eci-sandboxes
+	kubectl set image deployment/prewarmed-wasm-go-engine secure-engine=eci-go-engine:v$(DEPLOY_TAG) -n eci-sandboxes
+	kubectl set image deployment/gui-engine gui-engine=eci-gui-engine:v$(DEPLOY_TAG) -n eci-sandboxes
 	kubectl rollout status deployment/prewarmed-cpp-engine -n eci-sandboxes
 	kubectl rollout status deployment/prewarmed-python-engine -n eci-sandboxes
 	kubectl rollout status deployment/prewarmed-jvm-engine -n eci-sandboxes
 	kubectl rollout status deployment/prewarmed-dotnet-engine -n eci-sandboxes
+	kubectl rollout status deployment/prewarmed-go-engine -n eci-sandboxes
+	kubectl rollout status deployment/prewarmed-rust-engine -n eci-sandboxes
+	kubectl rollout status deployment/prewarmed-node-engine -n eci-sandboxes
+	kubectl rollout status deployment/prewarmed-wasm-engine -n eci-sandboxes
+	kubectl rollout status deployment/prewarmed-wasm-rust-engine -n eci-sandboxes
+	kubectl rollout status deployment/prewarmed-wasm-go-engine -n eci-sandboxes
+	kubectl rollout status deployment/gui-engine -n eci-sandboxes
 
 deploy-cloud: init
 	@echo "☁️ [CLOUD] Deploying Git SHA: $(CLOUD_TAG) from registry $(REGISTRY)"
@@ -90,10 +125,16 @@ deploy-cloud: init
 	kubectl set image deployment/prewarmed-python-engine secure-engine=$(REGISTRY)/eci-python-engine:$(CLOUD_TAG) -n eci-sandboxes
 	kubectl set image deployment/prewarmed-jvm-engine secure-engine=$(REGISTRY)/eci-jvm-engine:$(CLOUD_TAG) -n eci-sandboxes
 	kubectl set image deployment/prewarmed-dotnet-engine secure-engine=$(REGISTRY)/eci-dotnet-engine:$(CLOUD_TAG) -n eci-sandboxes
+	kubectl set image deployment/prewarmed-go-engine secure-engine=$(REGISTRY)/eci-go-engine:$(CLOUD_TAG) -n eci-sandboxes
+	kubectl set image deployment/prewarmed-rust-engine secure-engine=$(REGISTRY)/eci-rust-engine:$(CLOUD_TAG) -n eci-sandboxes
+	kubectl set image deployment/prewarmed-node-engine secure-engine=$(REGISTRY)/eci-node-engine:$(CLOUD_TAG) -n eci-sandboxes
 	kubectl rollout status deployment/prewarmed-cpp-engine -n eci-sandboxes
 	kubectl rollout status deployment/prewarmed-python-engine -n eci-sandboxes
 	kubectl rollout status deployment/prewarmed-jvm-engine -n eci-sandboxes
 	kubectl rollout status deployment/prewarmed-dotnet-engine -n eci-sandboxes
+	kubectl rollout status deployment/prewarmed-go-engine -n eci-sandboxes
+	kubectl rollout status deployment/prewarmed-rust-engine -n eci-sandboxes
+	kubectl rollout status deployment/prewarmed-node-engine -n eci-sandboxes
 
 # 🚀 The Master Hybrid Command
 all:
@@ -120,6 +161,43 @@ all-local:
 	$(MAKE) clean
 	$(MAKE) deploy-local
 
+# ============================================================
+# Dev Workflow (Phase 1.5 - Hot Reloading)
+# ============================================================
+dev-tunnel:
+	@echo "🚇 Establishing Redis Tunnel (Port 6379)..."
+	@kubectl port-forward svc/redis-svc 6379:6379 -n eci-system || echo "Tunnel may already be running"
+
+dev-gateway:
+	@echo "🚀 Starting Local API Gateway (Hot Reload Enabled)..."
+	$env:REDIS_HOST="localhost" ; $env:ENV="development" ; cd src/api-gateway && uvicorn main:app --app-dir src --host 0.0.0.0 --port 8080 --reload
+
+dev-orchestrator:
+	@echo "🚀 Starting Local Environment Orchestrator (Hot Reload Enabled)..."
+	$env:REDIS_HOST="localhost" ; $env:ENV="development" ; cd src/environment-orchestrator && python src/worker.py
+
+dev:
+	@echo "🌐 Launching Phase 1.5 Master Dev Environment..."
+	@powershell -ExecutionPolicy Bypass -File scripts/start_dev.ps1
+
 tst:
+	@echo "🧹 Flushing Redis Queue to prevent processing old payloads..."
+	kubectl exec deployment/redis -n eci-system -- redis-cli flushall || true
+	@echo "🌱 Re-seeding PodCatalog to Redis Cache..."
+	python scripts/seed_db.py
 	@echo "🚀 Running the e2e test script..."
-	PYTHONUTF8=1 python test_e2e_gauntlet.py
+	$env:PYTHONIOENCODING="utf-8" ; python test_e2e_gauntlet.py || set PYTHONIOENCODING=utf-8 && python test_e2e_gauntlet.py
+
+# ============================================================
+# Garbage Collection (Phase 1.1 & 1.2)
+# ============================================================
+clean-images:
+	@echo "🧹 Pruning dangling Docker images to reclaim disk space..."
+	docker image prune -f
+	@echo "✅ Local image cleanup complete."
+
+clean-pods:
+	@echo "🧹 Deleting dead (Completed/Failed) pods from eci-sandboxes..."
+	kubectl delete pods --field-selector status.phase=Succeeded -n eci-sandboxes || true
+	kubectl delete pods --field-selector status.phase=Failed -n eci-sandboxes || true
+	@echo "✅ Pod cleanup complete."

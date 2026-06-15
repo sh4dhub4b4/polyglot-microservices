@@ -63,6 +63,7 @@ RUN apt-get update && \
     golang-go \
     rustc \
     cargo \
+    emscripten \
     libseccomp2 \
     make \
     && rm -rf /var/lib/apt/lists/*

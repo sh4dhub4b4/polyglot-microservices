@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gui-engine
+  namespace: eci-sandboxes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gui-engine
+  template:
+    metadata:
+      labels:
+        app: gui-engine
+    spec:
+      containers:
+        - name: gui-engine
+          image: eci-gui-engine:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 6080 # noVNC Web UI
+            - containerPort: 8080 # Backend API
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1500m"
+              memory: "2Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gui-engine-svc
+  namespace: eci-sandboxes
+spec:
+  selector:
+    app: gui-engine
+  ports:
+    - name: novnc
+      protocol: TCP
+      port: 6080
+      targetPort: 6080
+    - name: api
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

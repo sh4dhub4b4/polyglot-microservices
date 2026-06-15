@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sandbox-gc-sa
+  namespace: eci-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sandbox-gc-role
+  namespace: eci-sandboxes
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sandbox-gc-rolebinding
+  namespace: eci-sandboxes
+subjects:
+- kind: ServiceAccount
+  name: sandbox-gc-sa
+  namespace: eci-system
+roleRef:
+  kind: Role
+  name: sandbox-gc-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sandbox-gc
+  namespace: eci-system
+spec:
+  schedule: "*/30 * * * *" # Run every 30 minutes
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: sandbox-gc-sa
+          containers:
+          - name: kubectl
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting Sandbox Garbage Collection..."
+              kubectl delete pods --field-selector status.phase=Succeeded -n eci-sandboxes
+              kubectl delete pods --field-selector status.phase=Failed -n eci-sandboxes
+              echo "Garbage Collection Complete."
+          restartPolicy: OnFailure

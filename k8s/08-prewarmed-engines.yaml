@@ -1,209 +1,489 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  labels:
+    app: pre-warmed-sandbox
+    env_type: cpp-basic
   name: prewarmed-cpp-engine
   namespace: eci-sandboxes
-  labels:
-    app: pre-warmed-sandbox
-    env_type: cpp
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: pre-warmed-sandbox
-      env_type: cpp
+      env_type: cpp-basic
   template:
     metadata:
       labels:
         app: pre-warmed-sandbox
-        env_type: cpp
+        env_type: cpp-basic
     spec:
+      automountServiceAccountToken: false
       containers:
-        - name: secure-engine
-          image: eci-cpp-engine:latest
-          imagePullPolicy: IfNotPresent
-          securityContext:
-            capabilities:
-              add: ["SYS_ADMIN"]
-          ports:
-            - containerPort: 8080
-          livenessProbe:
-            tcpSocket:
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 3
-            failureThreshold: 3
-          resources:
-            requests:
-              memory: "64Mi"
-              cpu: "20m"
-            limits:
-              memory: "256Mi"
-              cpu: "500m"
-          volumeMounts:
-            - mountPath: /tmp
-              name: ram-disk
+      - image: eci-cpp-engine:v1780262365
+        imagePullPolicy: IfNotPresent
+        name: secure-engine
+        resources:
+          limits:
+            cpu: 500m
+            memory: 384Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+        volumeMounts:
+        - mountPath: /tmp
+          name: ram-disk
+      securityContext:
+        runAsGroup: 10002
+        runAsNonRoot: true
+        runAsUser: 10002
+        seccompProfile:
+          type: RuntimeDefault
       volumes:
-        - name: ram-disk
-          emptyDir:
-            medium: Memory
+      - emptyDir:
+          medium: Memory
+        name: ram-disk
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  labels:
+    app: pre-warmed-sandbox
+    env_type: python-ds
   name: prewarmed-python-engine
   namespace: eci-sandboxes
-  labels:
-    app: pre-warmed-sandbox
-    env_type: python
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: pre-warmed-sandbox
-      env_type: python
+      env_type: python-ds
   template:
     metadata:
       labels:
         app: pre-warmed-sandbox
-        env_type: python
+        env_type: python-ds
     spec:
+      automountServiceAccountToken: false
       containers:
-        - name: secure-engine
-          image: eci-python-engine:latest
-          imagePullPolicy: IfNotPresent
-          securityContext:
-            capabilities:
-              add: ["SYS_ADMIN"]
-          ports:
-            - containerPort: 8080
-          livenessProbe:
-            tcpSocket:
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 3
-            failureThreshold: 3
-          resources:
-            requests:
-              memory: "64Mi"
-              cpu: "20m"
-            limits:
-              memory: "256Mi"
-              cpu: "500m"
-          volumeMounts:
-            - mountPath: /tmp
-              name: ram-disk
+      - image: eci-python-engine:v1780262365
+        imagePullPolicy: IfNotPresent
+        name: secure-engine
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 20m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+        volumeMounts:
+        - mountPath: /tmp
+          name: ram-disk
+      securityContext:
+        runAsGroup: 10002
+        runAsNonRoot: true
+        runAsUser: 10002
+        seccompProfile:
+          type: RuntimeDefault
       volumes:
-        - name: ram-disk
-          emptyDir:
-            medium: Memory
+      - emptyDir:
+          medium: Memory
+        name: ram-disk
 ---
-# ==========================================
-# JVM Engine (Java / Kotlin)
-# ==========================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  labels:
+    app: pre-warmed-sandbox
+    env_type: java-basic
   name: prewarmed-jvm-engine
   namespace: eci-sandboxes
-  labels:
-    app: pre-warmed-sandbox
-    env_type: jvm
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: pre-warmed-sandbox
-      env_type: jvm
+      env_type: java-basic
   template:
     metadata:
       labels:
         app: pre-warmed-sandbox
-        env_type: jvm
+        env_type: java-basic
     spec:
+      automountServiceAccountToken: false
       containers:
-        - name: secure-engine
-          image: eci-jvm-engine:latest
-          imagePullPolicy: IfNotPresent
-          securityContext:
-            capabilities:
-              add: ["SYS_ADMIN"]
-          ports:
-            - containerPort: 8080
-          livenessProbe:
-            tcpSocket:
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 3
-            failureThreshold: 3
-          resources:
-            requests:
-              memory: "128Mi"
-              cpu: "50m"
-            limits:
-              memory: "512Mi"   # JVM needs more RAM than native engines
-              cpu: "500m"
-          volumeMounts:
-            - mountPath: /tmp
-              name: ram-disk
+      - image: eci-jvm-engine:v1780262365
+        imagePullPolicy: IfNotPresent
+        name: secure-engine
+        resources:
+          limits:
+            cpu: 500m
+            memory: 1024Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+        volumeMounts:
+        - mountPath: /tmp
+          name: ram-disk
+      securityContext:
+        runAsGroup: 10002
+        runAsNonRoot: true
+        runAsUser: 10002
+        seccompProfile:
+          type: RuntimeDefault
       volumes:
-        - name: ram-disk
-          emptyDir:
-            medium: Memory
+      - emptyDir:
+          medium: Memory
+        name: ram-disk
 ---
-# ==========================================
-# .NET Engine (C#)
-# ==========================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: prewarmed-dotnet-engine
-  namespace: eci-sandboxes
   labels:
     app: pre-warmed-sandbox
-    env_type: dotnet
+    env_type: csharp-dotnet
+  name: prewarmed-dotnet-engine
+  namespace: eci-sandboxes
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: pre-warmed-sandbox
-      env_type: dotnet
+      env_type: csharp-dotnet
   template:
     metadata:
       labels:
         app: pre-warmed-sandbox
-        env_type: dotnet
+        env_type: csharp-dotnet
     spec:
+      automountServiceAccountToken: false
       containers:
-        - name: secure-engine
-          image: eci-dotnet-engine:latest
-          imagePullPolicy: IfNotPresent
-          securityContext:
-            capabilities:
-              add: ["SYS_ADMIN"]
-          ports:
-            - containerPort: 8080
-          livenessProbe:
-            tcpSocket:
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 3
-            failureThreshold: 3
-          resources:
-            requests:
-              memory: "128Mi"
-              cpu: "50m"
-            limits:
-              memory: "384Mi"
-              cpu: "500m"
-          volumeMounts:
-            - mountPath: /tmp
-              name: ram-disk
+      - image: eci-dotnet-engine:v1780262365
+        imagePullPolicy: IfNotPresent
+        name: secure-engine
+        resources:
+          limits:
+            cpu: 500m
+            memory: 384Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+        volumeMounts:
+        - mountPath: /tmp
+          name: ram-disk
+      securityContext:
+        runAsGroup: 10002
+        runAsNonRoot: true
+        runAsUser: 10002
+        seccompProfile:
+          type: RuntimeDefault
       volumes:
-        - name: ram-disk
-          emptyDir:
-            medium: Memory
+      - emptyDir:
+          medium: Memory
+        name: ram-disk
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pre-warmed-sandbox
+    env_type: go-sys
+  name: prewarmed-go-engine
+  namespace: eci-sandboxes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pre-warmed-sandbox
+      env_type: go-sys
+  template:
+    metadata:
+      labels:
+        app: pre-warmed-sandbox
+        env_type: go-sys
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - image: eci-go-engine:v1780262365
+        imagePullPolicy: IfNotPresent
+        name: secure-engine
+        resources:
+          limits:
+            cpu: 500m
+            memory: 384Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+        volumeMounts:
+        - mountPath: /tmp
+          name: ram-disk
+      securityContext:
+        runAsGroup: 10002
+        runAsNonRoot: true
+        runAsUser: 10002
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - emptyDir:
+          medium: Memory
+        name: ram-disk
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pre-warmed-sandbox
+    env_type: rust-sys
+  name: prewarmed-rust-engine
+  namespace: eci-sandboxes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pre-warmed-sandbox
+      env_type: rust-sys
+  template:
+    metadata:
+      labels:
+        app: pre-warmed-sandbox
+        env_type: rust-sys
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - image: eci-rust-engine:v1780262365
+        imagePullPolicy: IfNotPresent
+        name: secure-engine
+        resources:
+          limits:
+            cpu: 500m
+            memory: 384Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+        volumeMounts:
+        - mountPath: /tmp
+          name: ram-disk
+      securityContext:
+        runAsGroup: 10002
+        runAsNonRoot: true
+        runAsUser: 10002
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - emptyDir:
+          medium: Memory
+        name: ram-disk
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pre-warmed-sandbox
+    env_type: node-js
+  name: prewarmed-node-engine
+  namespace: eci-sandboxes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pre-warmed-sandbox
+      env_type: node-js
+  template:
+    metadata:
+      labels:
+        app: pre-warmed-sandbox
+        env_type: node-js
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - image: eci-node-engine:v1780262365
+        imagePullPolicy: IfNotPresent
+        name: secure-engine
+        resources:
+          limits:
+            cpu: 500m
+            memory: 384Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+        volumeMounts:
+        - mountPath: /tmp
+          name: ram-disk
+      securityContext:
+        runAsGroup: 10002
+        runAsNonRoot: true
+        runAsUser: 10002
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - emptyDir:
+          medium: Memory
+        name: ram-disk
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pre-warmed-sandbox
+    env_type: wasm-cpp
+  name: prewarmed-wasm-engine
+  namespace: eci-sandboxes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pre-warmed-sandbox
+      env_type: wasm-cpp
+  template:
+    metadata:
+      labels:
+        app: pre-warmed-sandbox
+        env_type: wasm-cpp
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - image: eci-wasm-engine:v1780262365
+        imagePullPolicy: IfNotPresent
+        name: secure-engine
+        resources:
+          limits:
+            cpu: 500m
+            memory: 384Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+        volumeMounts:
+        - mountPath: /tmp
+          name: ram-disk
+      securityContext:
+        runAsGroup: 10002
+        runAsNonRoot: true
+        runAsUser: 10002
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - emptyDir:
+          medium: Memory
+        name: ram-disk
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pre-warmed-sandbox
+    env_type: wasm-rust
+  name: prewarmed-wasm-rust-engine
+  namespace: eci-sandboxes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pre-warmed-sandbox
+      env_type: wasm-rust
+  template:
+    metadata:
+      labels:
+        app: pre-warmed-sandbox
+        env_type: wasm-rust
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - image: eci-rust-engine:v1780262365
+        imagePullPolicy: IfNotPresent
+        name: secure-engine
+        resources:
+          limits:
+            cpu: 500m
+            memory: 384Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+        volumeMounts:
+        - mountPath: /tmp
+          name: ram-disk
+      securityContext:
+        runAsGroup: 10002
+        runAsNonRoot: true
+        runAsUser: 10002
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - emptyDir:
+          medium: Memory
+        name: ram-disk
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pre-warmed-sandbox
+    env_type: wasm-go
+  name: prewarmed-wasm-go-engine
+  namespace: eci-sandboxes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pre-warmed-sandbox
+      env_type: wasm-go
+  template:
+    metadata:
+      labels:
+        app: pre-warmed-sandbox
+        env_type: wasm-go
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - image: eci-go-engine:v1780262365
+        imagePullPolicy: IfNotPresent
+        name: secure-engine
+        resources:
+          limits:
+            cpu: 500m
+            memory: 384Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+        volumeMounts:
+        - mountPath: /tmp
+          name: ram-disk
+      securityContext:
+        runAsGroup: 10002
+        runAsNonRoot: true
+        runAsUser: 10002
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - emptyDir:
+          medium: Memory
+        name: ram-disk

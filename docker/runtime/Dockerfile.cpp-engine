@@ -14,8 +14,18 @@ FROM ubuntu:22.04
 # Create the unprivileged user for security
 RUN groupadd -g 10002 sandboxgroup && useradd -u 10002 -g sandboxgroup -s /bin/false sandboxuser
 
-# INSTALL python-is-python3 so the "python" command works natively
-RUN apt-get update && apt-get install -y python3 python-is-python3 && rm -rf /var/lib/apt/lists/*
+# INSTALL python-is-python3 so the "python" command works natively, plus tools for emscripten
+RUN apt-get update && apt-get install -y python3 python-is-python3 git xz-utils bzip2 curl && rm -rf /var/lib/apt/lists/*
+
+# Install Emscripten SDK globally for WASM compilation
+WORKDIR /opt
+RUN git clone https://github.com/emscripten-core/emsdk.git && \
+    cd emsdk && \
+    ./emsdk install latest && \
+    ./emsdk activate latest && \
+    chmod -R 777 /opt/emsdk
+
+ENV PATH="/opt/emsdk:/opt/emsdk/upstream/emscripten:${PATH}"
 
 WORKDIR /app
 COPY --from=builder /app/build/engine_binary .
