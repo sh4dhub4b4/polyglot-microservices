@@ -12,7 +12,7 @@ jobs:
   docker-vulnerability-scan:
     runs-on: ubuntu-latest
     permissions:
-      security-events: write  # Add this here
+      security-events: write
     steps:
       - uses: actions/checkout@v4
       
@@ -26,7 +26,8 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-results.sarif'
 
@@ -35,6 +36,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install AFL++ (Placeholder)
+        run: echo "Install AFL++ to fuzz C++ sandbox syscall filters..."
+      - name: Run Fuzzer
+        run: echo "Fuzzing completed."      - name: Install AFL++ (Placeholder)
         run: echo "Install AFL++ to fuzz C++ sandbox syscall filters..."
       - name: Run Fuzzer
         run: echo "Fuzzing completed."
