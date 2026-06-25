@@ -1,9 +1,6 @@
-/**
- * WasmExecutor
- * Handles execution of standard algorithms directly in the user's browser using WebAssembly.
- * This is meant to reduce cloud costs as specified in the architecture.
- */
 import { useWorkspaceStore } from '../store/workspaceStore';
+
+const WS_BASE = `ws://${window.location.host}`;
 
 export class WasmExecutor {
   private pyodide: any = null;
@@ -58,7 +55,53 @@ export class WasmExecutor {
 
   async runCpp(code: string): Promise<void> {
     const { appendTerminalOutput } = useWorkspaceStore.getState();
-    appendTerminalOutput('C++ WASM Execution not yet fully integrated.\r\n');
+    appendTerminalOutput('Compiling & executing C++ via server (local WASM path)...\r\n');
+
+    const studentUser = this._getStoredUser();
+    const ws = new WebSocket(`${WS_BASE}/ws/execute`);
+
+    return new Promise((resolve) => {
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          source_code: code,
+          env_type: 'cpp-basic',
+          student_id: studentUser?.userId || 'unknown',
+          mode: 'batch',
+          stdin_data: '',
+        }));
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        const status = data.status;
+
+        if (status === 'queued' || status === 'executing') {
+          if (data.message) appendTerminalOutput(data.message + '\r\n');
+        } else if (status === 'completed') {
+          if (data.stdout) appendTerminalOutput(data.stdout);
+          if (data.stderr) appendTerminalOutput('STDERR: ' + data.stderr + '\r\n');
+          if (data.exit_code !== undefined) {
+            appendTerminalOutput(`\r\nProcess exited with code ${data.exit_code}\r\n`);
+          }
+          ws.close();
+          resolve();
+        } else if (status === 'error') {
+          appendTerminalOutput('Error: ' + (data.message || 'Execution failed') + '\r\n');
+          ws.close();
+          resolve();
+        }
+      };
+
+      ws.onerror = () => {
+        appendTerminalOutput('WebSocket connection error. Is the server running?\r\n');
+        resolve();
+      };
+    });
+  }
+
+  private _getStoredUser(): { userId: string; role: string } | null {
+    const stored = localStorage.getItem('eci_user');
+    return stored ? JSON.parse(stored) : null;
   }
 }
 

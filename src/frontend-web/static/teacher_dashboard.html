@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Teacher Dashboard — Polyglot ECI</title>
+  <meta name="description" content="Teacher Academic Dashboard — manage courses, assignments, and view student submissions." />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+<div class="app-shell">
+  <!-- ── SIDEBAR ────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">⚡</div>
+      <div>
+        <div class="logo-text">ECI Platform</div>
+        <div class="logo-sub">Teacher Dashboard</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Academic</div>
+      <div class="nav-item active" data-section="my-courses" onclick="switchSection('my-courses', this)">
+        <span class="icon">📚</span> My Courses
+      </div>
+      <div class="nav-item" data-section="assignments" onclick="switchSection('assignments', this)">
+        <span class="icon">📋</span> Assignments
+      </div>
+      <div class="nav-item" data-section="submissions" onclick="switchSection('submissions', this)">
+        <span class="icon">📝</span> Submissions
+      </div>
+
+      <div class="nav-section-label">Environment</div>
+      <div class="nav-item" data-section="pod-catalog" onclick="switchSection('pod-catalog', this)">
+        <span class="icon">⚙️</span> Pod Catalog
+      </div>
+
+      <div class="nav-section-label">Platform</div>
+      <div class="nav-item" data-section="billing" onclick="switchSection('billing', this)">
+        <span class="icon">💳</span> Credits & Billing
+      </div>
+    </nav>
+
+    <div style="padding:14px 16px; border-top:1px solid var(--border-subtle);">
+      <button class="btn btn-ghost btn-sm" onclick="Auth.logout()" style="width:100%">⎋ Logout</button>
+    </div>
+  </aside>
+
+  <!-- ── TOPBAR ─────────────────────────────────────── -->
+  <header class="topbar">
+    <span class="topbar-title">Faculty Dashboard</span>
+    <div class="user-pill" id="user-pill"></div>
+  </header>
+
+  <!-- ── MAIN CONTENT ───────────────────────────────── -->
+  <main class="main-content">
+
+    <!-- ═══════════════════════════════════════
+         SECTION: My Courses
+    ═══════════════════════════════════════ -->
+    <section id="my-courses" class="content-section">
+      <div class="page-header" style="display:flex; justify-content:space-between; align-items:center">
+        <div>
+          <h1>📚 Course Offerings</h1>
+          <p>Manage your classes and course sections.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('course-modal')">+ Create Course</button>
+      </div>
+
+      <!-- Quick Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">📚</div>
+          <div class="stat-value" id="stat-courses">—</div>
+          <div class="stat-label">Total Courses</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <div class="stat-value" id="stat-capacity">—</div>
+          <div class="stat-label">Total Seat Capacity</div>
+        </div>
+      </div>
+
+      <!-- Credits Bar -->
+      <div class="credits-bar" onclick="switchSection('billing', document.querySelector('[data-section=\\'billing\\']'))" style="cursor:pointer">
+        <div>
+          <div class="label" id="credits-tenant-name">University Credits</div>
+          <div class="tier" id="credits-tier">Loading...</div>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="credits-fill" style="width:0%"></div></div>
+        <div class="value" id="credits-value">—</div>
+      </div>
+
+      <!-- Course Table -->
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-header-title">Active Courses</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Section</th>
+              <th>Capacity</th>
+              <th>Course ID</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="courses-tbody">
+            <tr><td colspan="4" class="text-muted" style="text-align:center;padding:24px">Loading courses...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         SECTION: Assignments
+    ═══════════════════════════════════════ -->
+    <section id="assignments" class="content-section hidden">
+      <div class="page-header" style="display:flex; justify-content:space-between; align-items:center">
+        <div>
+          <h1>📋 Assignments</h1>
+          <p>Manage programming assignments for your courses.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('assignment-modal')">+ Post Assignment</button>
+      </div>
+
+      <div class="form-group mb-4">
+        <label class="form-label">Filter by Course</label>
+        <select id="course-filter" class="form-select" style="max-width:360px" onchange="loadAssignmentsForCourse(this.value)">
+          <option value="">— Select a course —</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-header-title">Course Assignments</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Due Date</th>
+              <th>Max Marks</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="assignments-tbody">
+            <tr><td colspan="5" class="text-muted" style="text-align:center;padding:24px">Select a course to view assignments.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         SECTION: Submissions
+    ═══════════════════════════════════════ -->
+    <section id="submissions" class="content-section hidden">
+      <div class="page-header">
+        <h1>📝 Student Submissions</h1>
+        <p>Review and grade student code submissions.</p>
+      </div>
+
+      <div class="flex gap-4 mb-4">
+        <div class="form-group" style="flex:1; max-width:300px">
+          <label class="form-label">Course</label>
+          <select id="sub-course-filter" class="form-select" onchange="loadAssignmentFilterForSubmissions(this.value)">
+             <option value="">— Select Course —</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1; max-width:300px">
+          <label class="form-label">Assignment</label>
+          <select id="sub-assign-filter" class="form-select" onchange="loadSubmissions(this.value)" disabled>
+             <option value="">— Select Assignment —</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-header-title">Submissions</span>
+          <button class="btn btn-ghost btn-sm" onclick="loadSubmissions(document.getElementById('sub-assign-filter').value)">🔄 Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Student ID</th>
+              <th>Language</th>
+              <th>Tests Passed</th>
+              <th>Marks</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="submissions-tbody">
+            <tr><td colspan="7" class="text-muted" style="text-align:center;padding:24px">Select an assignment to view submissions.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         SECTION: Pod Catalog
+    ═══════════════════════════════════════ -->
+    <section id="pod-catalog" class="content-section hidden">
+      <div class="page-header">
+        <h1>⚙️ Execution Environments (Pod Catalog)</h1>
+        <p>Available sandbox environments for student assignments and custom pod requests.</p>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-title">Custom Pods</div>
+        <p class="text-sm text-muted mt-2">
+          If you require a custom environment (e.g., specific libraries, databases, or frameworks), please contact your University Admin to create a Custom Pod. Once created, you can restrict assignments to use it.
+        </p>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header"><span class="table-header-title">Available Default Environments</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Env ID</th>
+              <th>Description</th>
+              <th>Base Cost (Credits)</th>
+              <th>Type</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="badge badge-blue">cpp-basic</span></td><td>C++17 standard compiler (g++)</td><td>1.0</td><td>CLI</td></tr>
+            <tr><td><span class="badge badge-yellow">python-ds</span></td><td>Python 3.10 with NumPy/Pandas</td><td>1.5</td><td>CLI</td></tr>
+            <tr><td><span class="badge badge-red">java-basic</span></td><td>Java 17 JDK</td><td>1.2</td><td>CLI</td></tr>
+            <tr><td><span class="badge badge-green">node-js</span></td><td>Node.js 18 LTS</td><td>1.0</td><td>CLI</td></tr>
+            <tr><td><span class="badge badge-purple">rust-sys</span></td><td>Rust 1.70</td><td>1.0</td><td>CLI</td></tr>
+            <tr><td><span class="badge badge-blue">go-sys</span></td><td>Go 1.20</td><td>1.0</td><td>CLI</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         SECTION: Billing
+    ═══════════════════════════════════════ -->
+    <section id="billing" class="content-section hidden">
+      <div class="page-header">
+        <h1>💳 Compute Credits & Billing</h1>
+        <p>Monitor your university's real-time execution costs and credits usage.</p>
+      </div>
+
+      <div class="grid-2 mb-4">
+        <div class="stat-card" style="border-color:var(--accent)">
+          <div class="stat-icon">💰</div>
+          <div class="stat-value" id="billing-credits-large" style="color:var(--success)">—</div>
+          <div class="stat-label" id="billing-tenant-large">Compute Credits Remaining</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header"><span class="table-header-title">Recent Execution Transactions</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Task ID</th>
+              <th>Student ID</th>
+              <th>Env (Pod)</th>
+              <th>Time (ms)</th>
+              <th>Credits Deducted</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="billing-tbody">
+            <tr><td colspan="6" class="text-muted" style="text-align:center;padding:24px">Loading transactions...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ── MODALS ────────────────────────────────────────── -->
+
+<!-- Course Modal -->
+<div class="modal-overlay" id="course-modal">
+  <div class="modal">
+    <div class="modal-title">Create New Course</div>
+    <div class="modal-sub">Create a new course section for this semester.</div>
+    <form onsubmit="handleCreateCourse(event)">
+      <div class="form-group">
+        <label class="form-label">Section Number</label>
+        <input type="text" id="course-section" class="form-input" placeholder="e.g. CS101-A" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Max Capacity</label>
+        <input type="number" id="course-capacity" class="form-input" value="40" min="1" required>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('course-modal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btn-create-course">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Assignment Modal -->
+<div class="modal-overlay" id="assignment-modal">
+  <div class="modal" style="max-width:600px; max-height:90vh; overflow-y:auto">
+    <div class="modal-title">Post New Assignment</div>
+    <div class="modal-sub">Create a coding assignment with hidden test cases for auto-grading.</div>
+    <form onsubmit="handleCreateAssignment(event)">
+      <div class="form-group">
+        <label class="form-label">Course Section</label>
+        <select id="assign-course-id" class="form-select" required></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Assignment Title</label>
+        <input type="text" id="assign-title" class="form-input" placeholder="e.g. Linked List Implementation" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description / Instructions</label>
+        <textarea id="assign-desc" class="form-textarea" placeholder="Write problem statement here..."></textarea>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Allowed Environment (Pod)</label>
+          <select id="assign-pod" class="form-select">
+            <option value="">Any (No restriction)</option>
+            <option value="cpp-basic">C++ Basic</option>
+            <option value="python-ds">Python / Data Science</option>
+            <option value="java-basic">Java</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Max Marks</label>
+          <input type="number" id="assign-marks" class="form-input" value="100" min="1" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Due Date</label>
+        <input type="datetime-local" id="assign-due" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Hidden Test Cases (Auto-Grader JSON)</label>
+        <textarea id="assign-tests" class="form-textarea" placeholder='[{"stdin": "5", "expected_stdout": "10"}]' style="font-family:monospace; min-height:80px">[]</textarea>
+        <p class="text-sm text-muted mt-1">Must be valid JSON array.</p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('assignment-modal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btn-create-assign">Publish Assignment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Grade Modal -->
+<div class="modal-overlay" id="grade-modal">
+  <div class="modal">
+    <div class="modal-title">Grade Submission</div>
+    <div class="modal-sub">Manually override marks and provide feedback.</div>
+    <form onsubmit="handleGradeSubmission(event)">
+      <input type="hidden" id="grade-sub-id">
+      <div class="form-group">
+        <label class="form-label">Marks Awarded</label>
+        <input type="number" id="grade-marks" class="form-input" step="0.5" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Feedback</label>
+        <textarea id="grade-feedback" class="form-textarea" placeholder="Good job, but check edge cases..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('grade-modal')">Cancel</button>
+        <button type="submit" class="btn btn-success" id="btn-grade">Save Grade</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="./api.js"></script>
+<script>
+// ── State ────────────────────────────────────────────
+let myCourses = [];
+
+// ── Init ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!Auth.isLoggedIn()) { window.location.href = './login.html'; return; }
+  
+  const user = Auth.getUser();
+  if (user.role !== 'faculty') {
+    showToast('This dashboard is for faculty only. Redirecting...', 'error');
+    setTimeout(() => { window.location.href = './student_workspace.html'; }, 1500);
+    return;
+  }
+
+  renderUserPill();
+  await loadCourses();
+  await loadBillingCredits();
+});
+
+// ── Navigation ────────────────────────────────────────
+function switchSection(id, navEl) {
+  document.querySelectorAll('.content-section').forEach(s => s.classList.add('hidden'));
+  document.getElementById(id)?.classList.remove('hidden');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  navEl?.classList.add('active');
+
+  if (id === 'billing') loadBillingCredits();
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── Course Logic ──────────────────────────────────────
+async function loadCourses() {
+  try {
+    myCourses = await api.teacher.getCourses();
+    
+    // Update stats
+    document.getElementById('stat-courses').textContent = myCourses.length;
+    document.getElementById('stat-capacity').textContent = myCourses.reduce((sum, c) => sum + c.max_capacity, 0);
+
+    // Update table
+    const tbody = document.getElementById('courses-tbody');
+    if (!myCourses.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:24px">No courses found. Create one.</td></tr>';
+    } else {
+      tbody.innerHTML = myCourses.map(c => `
+        <tr>
+          <td><span class="badge badge-blue">${c.section_number}</span></td>
+          <td>${c.max_capacity} seats</td>
+          <td class="font-mono text-sm" style="color:var(--text-muted)">${c.id.slice(0,12)}...</td>
+          <td><button class="btn btn-ghost btn-sm" onclick="viewAssignments('${c.id}')">📋 Assignments</button></td>
+        </tr>
+      `).join('');
+    }
+
+    // Populate dropdowns
+    const populateSel = (id) => {
+      const sel = document.getElementById(id);
+      if(!sel) return;
+      sel.innerHTML = '<option value="">— Select a course —</option>' + 
+        myCourses.map(c => `<option value="${c.id}">${c.section_number}</option>`).join('');
+    };
+    populateSel('course-filter');
+    populateSel('sub-course-filter');
+    populateSel('assign-course-id');
+
+  } catch(e) { showToast('Failed to load courses: ' + e.message, 'error'); }
+}
+
+async function handleCreateCourse(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btn-create-course');
+  btn.textContent = 'Creating...'; btn.disabled = true;
+
+  try {
+    const payload = {
+      section_number: document.getElementById('course-section').value,
+      max_capacity: parseInt(document.getElementById('course-capacity').value)
+    };
+    await api.teacher.createCourse(payload);
+    showToast('Course created successfully', 'success');
+    closeModal('course-modal');
+    e.target.reset();
+    await loadCourses();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Create'; btn.disabled = false;
+  }
+}
+
+// ── Assignment Logic ──────────────────────────────────
+function viewAssignments(courseId) {
+  switchSection('assignments', document.querySelector('[data-section="assignments"]'));
+  const filter = document.getElementById('course-filter');
+  filter.value = courseId;
+  loadAssignmentsForCourse(courseId);
+}
+
+async function loadAssignmentsForCourse(courseId) {
+  if (!courseId) return;
+  const tbody = document.getElementById('assignments-tbody');
+  tbody.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:24px">Loading...</td></tr>';
+  
+  try {
+    // In actual implementation, we might need an endpoint for teacher's course assignments
+    // For MVP dummy, we reuse the student endpoint since they both fetch assignments by course
+    const assignments = await api.student.getAssignments(courseId);
+    
+    if (!assignments.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:24px">No assignments yet.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = assignments.map(a => `
+      <tr>
+        <td style="font-weight:500">${a.title}</td>
+        <td class="text-sm text-muted">${a.due_date ? new Date(a.due_date).toLocaleDateString() : 'No deadline'}</td>
+        <td>${a.max_marks}</td>
+        <td><span class="badge badge-green">Published</span></td>
+        <td><button class="btn btn-ghost btn-sm" onclick="viewSubmissions('${courseId}', '${a.id}')">📝 View Submissions</button></td>
+      </tr>
+    `).join('');
+  } catch(e) { showToast('Failed to load assignments: ' + e.message, 'error'); }
+}
+
+async function handleCreateAssignment(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btn-create-assign');
+  btn.textContent = 'Publishing...'; btn.disabled = true;
+
+  try {
+    let testCases = [];
+    const testsRaw = document.getElementById('assign-tests').value;
+    if (testsRaw) {
+      try { testCases = JSON.parse(testsRaw); }
+      catch(err) { throw new Error("Hidden test cases must be valid JSON"); }
+    }
+
+    const payload = {
+      course_offering_id: document.getElementById('assign-course-id').value,
+      title: document.getElementById('assign-title').value,
+      description: document.getElementById('assign-desc').value,
+      allowed_pod_id: document.getElementById('assign-pod').value || null,
+      max_marks: parseFloat(document.getElementById('assign-marks').value),
+      due_date: document.getElementById('assign-due').value ? new Date(document.getElementById('assign-due').value).toISOString() : null,
+      hidden_test_cases: testCases
+    };
+
+    await api.teacher.createAssignment(payload);
+    showToast('Assignment published', 'success');
+    closeModal('assignment-modal');
+    e.target.reset();
+    if (document.getElementById('course-filter').value === payload.course_offering_id) {
+      loadAssignmentsForCourse(payload.course_offering_id);
+    }
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Publish Assignment'; btn.disabled = false;
+  }
+}
+
+// ── Submissions Logic ─────────────────────────────────
+async function loadAssignmentFilterForSubmissions(courseId) {
+  const assignSel = document.getElementById('sub-assign-filter');
+  assignSel.innerHTML = '<option value="">— Loading... —</option>';
+  assignSel.disabled = true;
+
+  if (!courseId) {
+    assignSel.innerHTML = '<option value="">— Select Assignment —</option>';
+    return;
+  }
+
+  try {
+    const assignments = await api.student.getAssignments(courseId);
+    assignSel.innerHTML = '<option value="">— Select Assignment —</option>' +
+      assignments.map(a => `<option value="${a.id}">${a.title}</option>`).join('');
+    assignSel.disabled = false;
+  } catch(e) { showToast('Error loading assignments for filter', 'error'); }
+}
+
+function viewSubmissions(courseId, assignmentId) {
+  switchSection('submissions', document.querySelector('[data-section="submissions"]'));
+  const cFilter = document.getElementById('sub-course-filter');
+  cFilter.value = courseId;
+  
+  loadAssignmentFilterForSubmissions(courseId).then(() => {
+    document.getElementById('sub-assign-filter').value = assignmentId;
+    loadSubmissions(assignmentId);
+  });
+}
+
+async function loadSubmissions(assignmentId) {
+  if (!assignmentId) return;
+  const tbody = document.getElementById('submissions-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:24px">Loading...</td></tr>';
+  
+  try {
+    const subs = await api.teacher.getSubmissions(assignmentId);
+    
+    if (!subs.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:24px">No submissions yet.</td></tr>';
+      return;
+    }
+
+    const statusBadge = (s) => {
+      const map = { submitted:'badge-blue', graded:'badge-green', late:'badge-red', resubmitted:'badge-purple' };
+      return `<span class="badge ${map[s] || 'badge-blue'}">${s}</span>`;
+    };
+
+    tbody.innerHTML = subs.map(s => `
+      <tr>
+        <td class="font-mono text-sm" style="color:var(--text-muted)">${s.student_id.slice(0,8)}...</td>
+        <td><span class="badge badge-purple">${s.language}</span></td>
+        <td style="color:var(--success)">${s.tests_passed}/${s.tests_total}</td>
+        <td style="font-weight:600;color:var(--warning)">${s.marks_awarded ?? '—'}</td>
+        <td>${statusBadge(s.status)}</td>
+        <td class="text-sm text-muted">${s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : '—'}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="openGradeModal('${s.submission_id}', ${s.marks_awarded || 0})">✎ Grade</button></td>
+      </tr>
+    `).join('');
+  } catch(e) { showToast('Failed to load submissions: ' + e.message, 'error'); }
+}
+
+function openGradeModal(subId, currentMarks) {
+  document.getElementById('grade-sub-id').value = subId;
+  document.getElementById('grade-marks').value = currentMarks;
+  document.getElementById('grade-feedback').value = '';
+  openModal('grade-modal');
+}
+
+async function handleGradeSubmission(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btn-grade');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+
+  try {
+    const subId = document.getElementById('grade-sub-id').value;
+    const payload = {
+      marks_awarded: parseFloat(document.getElementById('grade-marks').value),
+      feedback: document.getElementById('grade-feedback').value
+    };
+    await api.teacher.gradeSubmission(subId, payload);
+    showToast('Grade saved successfully', 'success');
+    closeModal('grade-modal');
+    loadSubmissions(document.getElementById('sub-assign-filter').value);
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Save Grade'; btn.disabled = false;
+  }
+}
+
+// ── Billing Logic ─────────────────────────────────────
+async function loadBillingCredits() {
+  try {
+    const billing = await api.billing.getCredits();
+    
+    // Update labels
+    document.getElementById('credits-tenant-name').textContent = `${billing.tenant_name} Credits`;
+    document.getElementById('credits-tier').textContent = `Tier: ${billing.subscription_tier}`;
+    
+    // Format credits
+    const credits = parseFloat(billing.compute_credits_remaining).toFixed(2);
+    document.getElementById('credits-value').textContent = credits;
+    document.getElementById('billing-credits-large').textContent = credits;
+    document.getElementById('billing-tenant-large').textContent = billing.tenant_name;
+    
+    // Update progress bar (assuming 1000 is max/starting for demo)
+    const pct = Math.min(100, (parseFloat(credits) / 1000) * 100);
+    document.getElementById('credits-fill').style.width = `${pct}%`;
+    if (pct < 20) document.getElementById('credits-fill').style.background = 'var(--danger)';
+
+    // Update transactions table
+    const tbody = document.getElementById('billing-tbody');
+    if (!billing.recent_transactions || !billing.recent_transactions.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:24px">No recent executions.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = billing.recent_transactions.map(t => `
+      <tr>
+        <td class="font-mono text-sm" style="color:var(--text-muted)">${t.task_id.slice(0,8)}...</td>
+        <td class="font-mono text-sm">${t.student_id.slice(0,8)}...</td>
+        <td><span class="badge badge-purple">${t.pod_id || 'wasm'}</span></td>
+        <td class="font-mono text-sm">${t.execution_time_ms ? t.execution_time_ms.toFixed(1) : '—'}</td>
+        <td style="color:var(--danger);font-weight:600">-${t.credits_deducted.toFixed(4)}</td>
+        <td class="text-sm text-muted">${new Date(t.created_at).toLocaleString()}</td>
+      </tr>
+    `).join('');
+
+  } catch(e) {
+    document.getElementById('billing-tbody').innerHTML = `<tr><td colspan="6" class="text-danger" style="text-align:center;padding:24px">Error: ${e.message}</td></tr>`;
+  }
+}
+</script>
+
+</body>
+</html>

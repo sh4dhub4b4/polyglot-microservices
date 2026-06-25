@@ -65,24 +65,35 @@ class WebSocketRelayAdapter:
         pubsub = redis_client.pubsub()
         completed = asyncio.Event()
 
-        # Phase 2 Fix: Industry Standard Exponential Backoff (Race Condition handling)
-        max_retries = 5
+        # Wait for engine port to be ready before WebSocket connect
         ws = None
         try:
-            for attempt in range(max_retries):
+            max_port_wait = 15
+            for attempt in range(max_port_wait):
                 try:
-                    ws = await websockets.connect(ws_url, open_timeout=10)
-                    break  # Connected successfully
-                except Exception as e:
-                    if attempt == max_retries - 1:
-                        raise Exception(f"Failed to connect to pod WebSocket after {max_retries} attempts: {e}")
-                    await asyncio.sleep(0.5 * (2 ** attempt)) # 0.5s, 1s, 2s...
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(0.5)
+                    s.connect((host, port))
+                    s.close()
+                    break
+                except (ConnectionRefusedError, OSError):
+                    if attempt == max_port_wait - 1:
+                        raise Exception(f"Pod {pod_name} engine port {port} not ready after {max_port_wait * 0.5}s")
+                    await asyncio.sleep(0.5)
+
+            ws = await websockets.connect(ws_url, open_timeout=10)
 
             # ── Step 1: Send initial payload to the pod ──
-            await ws.send(json.dumps({
-                    "language": payload.get("env_type", payload.get("language")),
-                    "source_code": payload["source_code"]
-                }))
+            # GUI engines expect the full pod_catalog ID (e.g. "gui-opengl"),
+            # non-GUI engines expect the base language name (e.g. "cpp")
+            lang = payload.get("env_type") if payload.get("is_gui") else payload.get("engine_language", payload.get("env_type", payload.get("language")))
+            initial_msg = {
+                "language": lang,
+                "source_code": payload["source_code"],
+            }
+            if "stdin_data" in payload and payload["stdin_data"]:
+                initial_msg["stdin_data"] = payload["stdin_data"]
+            await ws.send(json.dumps(initial_msg))
 
             # ── Step 2: Subscribe to stdin channel for this task ──
             stdin_channel = f"task_stdin_{task_id}"

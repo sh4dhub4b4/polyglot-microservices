@@ -1,3 +1,5 @@
+import socket
+import time
 import requests
 from typing import Dict, Any
 from domain.ports import IEngineClient
@@ -5,6 +7,20 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 class HttpExecutorAdapter(IEngineClient):
     
+    def wait_for_port(self, ip: str, port: int, timeout: float = 2.0) -> bool:
+        start = time.time()
+        while True:
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(0.1)
+                s.connect((ip, port))
+                s.close()
+                return True
+            except (ConnectionRefusedError, OSError, socket.timeout):
+                if time.time() - start > timeout:
+                    return False
+                time.sleep(0.05)
+
     # Circuit Breaker / Retry logic:
     # If the pod is slow to start its internal HTTP server, or if there's a temporary network glitch,
     # retry up to 3 times, with exponential backoff (1s, 2s, 4s).
@@ -41,6 +57,8 @@ class HttpExecutorAdapter(IEngineClient):
             time.sleep(1.5) # Wait for tunnel to establish
 
         try:
+            if not self.wait_for_port(host, port):
+                raise ConnectionRefusedError(f"Pod {pod_name} engine did not bind to port {port} within timeout.")
             print(f"🔌 [Executor] Sending request to sandbox engine at {host}:{port}...")
             sandbox_url = f"http://{host}:{port}/api/v1/execute"
             

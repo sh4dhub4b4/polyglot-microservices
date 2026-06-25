@@ -2,6 +2,7 @@ import os
 import json
 import time
 import asyncio
+import traceback
 import redis
 import redis.asyncio as aioredis
 
@@ -62,6 +63,22 @@ def resolve_pod_catalog(task: dict) -> dict:
         
     task["env_type"] = env_type
     
+    engine_map = {
+        "cpp-basic": "cpp",
+        "python-ds": "python",
+        "java-basic": "java",
+        "csharp-dotnet": "csharp",
+        "node-js": "javascript",
+        "go-sys": "go",
+        "rust-sys": "rust",
+        "gui-opengl": "cpp",
+        "gui-java": "java",
+        "wasm-cpp": "cpp",
+        "wasm-rust": "rust",
+        "wasm-go": "go",
+    }
+    task["engine_language"] = engine_map.get(env_type, "cpp")
+    
     cached_data = redis_client.get(f"pod_catalog:{env_type}")
     if not cached_data:
         raise ValueError(f"Environment '{env_type}' not supported or not found in Pod Catalog.")
@@ -118,6 +135,8 @@ def handle_batch_task(task: dict, task_id: str):
         publish_status(task_id, "completed", "Execution finished successfully", extra=exec_res)
     except Exception as e:
         error_msg = f"Orchestrator error: {str(e)}"
+        print(f"❌ [BATCH] {error_msg}")
+        traceback.print_exc()
         extra_data = {}
         if pod_name:
             try:
@@ -143,6 +162,7 @@ async def handle_interactive_task(task: dict, task_id: str):
     Used when mode is 'interactive'.
     Flow: Provision pod → WebSocket to pod → Relay stdin/stdout via Redis PubSub
     """
+    pod_name = None
     try:
         task = resolve_pod_catalog(task)
 
@@ -188,6 +208,8 @@ async def handle_interactive_task(task: dict, task_id: str):
         publish_status(task_id, "error", str(e))
     except Exception as e:
         error_msg = f"Orchestrator error: {str(e)}"
+        print(f"❌ [INTERACTIVE] {error_msg}")
+        traceback.print_exc()
         extra_data = {}
         if pod_name:
             try:

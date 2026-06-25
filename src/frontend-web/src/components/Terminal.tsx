@@ -42,17 +42,16 @@ export const Terminal: React.FC<TerminalProps> = ({ onInput }) => {
     window.addEventListener('resize', handleResize);
 
     // Subscribe to store
-    const unsubscribe = useWorkspaceStore.subscribe(
-      (state) => state.terminalOutput,
-      (outputs, prevOutputs) => {
-        if (outputs.length === 0) {
-          term.clear();
-        } else if (outputs.length > prevOutputs.length) {
-          const newOutputs = outputs.slice(prevOutputs.length);
-          newOutputs.forEach(out => term.write(out));
-        }
+    const unsubscribe = useWorkspaceStore.subscribe((state, prevState) => {
+      const outputs = state.terminalOutput;
+      const prevOutputs = prevState.terminalOutput;
+      if (outputs.length === 0) {
+        term.clear();
+      } else if (outputs.length > prevOutputs.length) {
+        const newOutputs = outputs.slice(prevOutputs.length);
+        newOutputs.forEach(out => term.write(out));
       }
-    );
+    });
 
     return () => {
       unsubscribe();

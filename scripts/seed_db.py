@@ -7,6 +7,7 @@ import subprocess
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src', 'api-gateway', 'src'))
 
 from infrastructure.database import SessionLocal, engine, Base
+from sqlalchemy_utils import Ltree
 import infrastructure.orm_models as models
 
 def seed_db():
@@ -85,14 +86,28 @@ def seed_db():
 
         # Seed a dummy tenant (University) and map all pods to them so testing works smoothly
         dummy_tenant_id = uuid.UUID("12345678-1234-5678-1234-567812345678")
+        dummy_tenant = db.query(models.TenantORM).filter(models.TenantORM.id == dummy_tenant_id).first()
+        if not dummy_tenant:
+            dummy_tenant = models.TenantORM(
+                id=dummy_tenant_id,
+                name="University",
+                type=models.TenantType.UNIVERSITY,
+                path=Ltree("university"),
+                compute_credits=10000.0,
+                subscription_tier="Enterprise"
+            )
+            db.add(dummy_tenant)
+            db.commit()
+            print(f"[+] Created dummy tenant '{dummy_tenant.name}'.")
+
         print("\nMapping pods to Dummy Tenant (University)...")
         for pod in pods:
             existing_map = db.query(models.TenantEnabledPodsORM).filter(
-                models.TenantEnabledPodsORM.tenant_id == dummy_tenant_id,
+                models.TenantEnabledPodsORM.tenant_path == dummy_tenant.path,
                 models.TenantEnabledPodsORM.pod_id == pod.id
             ).first()
             if not existing_map:
-                db.add(models.TenantEnabledPodsORM(tenant_id=dummy_tenant_id, pod_id=pod.id))
+                db.add(models.TenantEnabledPodsORM(tenant_path=dummy_tenant.path, pod_id=pod.id))
                 print(f"[-] Mapped {pod.id} to dummy tenant.")
 
         db.commit()

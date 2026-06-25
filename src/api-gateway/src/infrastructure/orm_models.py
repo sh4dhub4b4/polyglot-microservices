@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, Float, Enum as SQLEnum, ForeignKey
+from sqlalchemy import Column, String, Integer, DateTime, Boolean, Float, Enum as SQLEnum, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from infrastructure.database import Base
@@ -34,6 +34,8 @@ class UserORM(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     email = Column(String, nullable=False, unique=True)
+    display_name = Column(String, nullable=True)
+    hashed_password = Column(String, nullable=True)
     role = Column(SQLEnum(UserRole), nullable=False)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     tenant_path = Column(LtreeType, nullable=False, index=True) # Copied from tenant for efficient hierarchical querying
@@ -91,4 +93,84 @@ class TenantEnabledPodsORM(Base):
     tenant_path = Column(LtreeType, nullable=False, index=True) # Allows inheritance queries using LTree @> operator
     pod_id = Column(String, ForeignKey("pod_catalog.id"), nullable=False)
     
-    pod = relationship("PodCatalogORM")
+    pod = relationship("PodCatalogORM")
+
+# ──────────────────────────────────────────
+# Academic Layer (Google Classroom Equivalent)
+# ──────────────────────────────────────────
+
+class AssignmentStatus(enum.Enum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    CLOSED = "closed"
+
+class SubmissionStatus(enum.Enum):
+    SUBMITTED = "submitted"
+    GRADED = "graded"
+    LATE = "late"
+    RESUBMITTED = "resubmitted"
+
+class AssignmentORM(Base):
+    """Teacher posts an assignment to a course offering."""
+    __tablename__ = "assignments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid7)
+    course_offering_id = Column(UUID(as_uuid=True), ForeignKey("course_offerings.id"), nullable=False)
+    created_by_faculty_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    title = Column(String(300), nullable=False)
+    description = Column(Text, nullable=True)
+    allowed_pod_id = Column(String, ForeignKey("pod_catalog.id"), nullable=True)  # restrict env type
+    max_marks = Column(Float, default=100.0)
+    due_date = Column(DateTime(timezone=True), nullable=True)
+    status = Column(SQLEnum(AssignmentStatus), nullable=False, default=AssignmentStatus.DRAFT)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default="now()")
+    updated_at = Column(DateTime(timezone=True), nullable=True)
+    # Hidden test cases stored as JSON string: [{"stdin": "1 2", "expected_stdout": "3"}]
+    hidden_test_cases = Column(Text, nullable=True)
+
+    course_offering = relationship("CourseOfferingORM")
+    faculty = relationship("UserORM", foreign_keys=[created_by_faculty_id])
+    allowed_pod = relationship("PodCatalogORM")
+    submissions = relationship("SubmissionORM", back_populates="assignment")
+
+class SubmissionORM(Base):
+    """Student submits code for an assignment. Stores latest attempt and auto-grader result."""
+    __tablename__ = "submissions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid7)
+    assignment_id = Column(UUID(as_uuid=True), ForeignKey("assignments.id"), nullable=False)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    source_code = Column(Text, nullable=False)
+    language = Column(String(50), nullable=False)
+    status = Column(SQLEnum(SubmissionStatus), nullable=False, default=SubmissionStatus.SUBMITTED)
+    submitted_at = Column(DateTime(timezone=True), nullable=False, server_default="now()")
+    # Auto-grader results
+    stdout = Column(Text, nullable=True)
+    stderr = Column(Text, nullable=True)
+    tests_passed = Column(Integer, default=0)
+    tests_total = Column(Integer, default=0)
+    marks_awarded = Column(Float, nullable=True)
+    grader_feedback = Column(Text, nullable=True)
+
+    assignment = relationship("AssignmentORM", back_populates="submissions")
+    student = relationship("UserORM")
+
+# ──────────────────────────────────────────
+# Billing Layer (Compute Credits Tracking)
+# ──────────────────────────────────────────
+
+class BillingTransactionORM(Base):
+    """Records every deduction of compute credits per execution."""
+    __tablename__ = "billing_transactions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid7)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    task_id = Column(String, nullable=False)  # ws task_id for traceability
+    pod_id = Column(String, nullable=True)
+    credits_deducted = Column(Float, nullable=False)
+    execution_time_ms = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default="now()")
+
+    tenant = relationship("TenantORM")
+    student = relationship("UserORM")

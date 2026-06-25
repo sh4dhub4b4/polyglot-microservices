@@ -22,7 +22,17 @@ def get_enrollment_use_case(db: Session = Depends(get_db)) -> EnrollStudentUseCa
     return EnrollStudentUseCase(course_repo, enrollment_repo)
 
 # --- The Actual API Endpoint ---
-@router.post("/", response_model=EnrollmentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/",
+    response_model=EnrollmentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Enroll a student in a course offering",
+    description="""
+    Enrolls a student in a specific course offering.
+    Validates:
+    - Student exists
+    - Course offering exists and is not at capacity
+    - Student is not already enrolled
+    """)
 def enroll_student(
     request: EnrollStudentRequest,
     use_case: EnrollStudentUseCase = Depends(get_enrollment_use_case)

@@ -14,7 +14,7 @@ jobs:
     permissions:
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Run Trivy vulnerability scanner on Repo
         uses: aquasecurity/trivy-action@master
@@ -34,11 +34,8 @@ jobs:
   cpp-sandbox-fuzzing:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install AFL++ (Placeholder)
-        run: echo "Install AFL++ to fuzz C++ sandbox syscall filters..."
-      - name: Run Fuzzer
-        run: echo "Fuzzing completed."      - name: Install AFL++ (Placeholder)
         run: echo "Install AFL++ to fuzz C++ sandbox syscall filters..."
       - name: Run Fuzzer
         run: echo "Fuzzing completed."

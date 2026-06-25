@@ -41,8 +41,6 @@ class ExecutionService:
             if not pod_ip:
                 raise Exception(f"Pod {pod_name} did not get an IP in time.")
                 
-            time.sleep(0.05)
-            
             result = self.engine_client.execute_code(pod_ip, source_code, stdin_data, env_type, pod_name=pod_name)
             is_success = True
             return result

@@ -28,7 +28,7 @@ class GuiProvisionerAdapter(ISandboxProvisioner):
         # Default fallback for unknown GUI
         return {"requests": {"memory": "512Mi", "cpu": "500m"}, "limits": {"memory": "2Gi", "cpu": "1500m"}}
 
-    def provision(self, student_id: uuid.UUID, course_code: str, env_type: str, docker_image: str = "eci-gui-engine:latest") -> Dict[str, Any]:
+    def provision(self, student_id: uuid.UUID, course_code: str, env_type: str, docker_image: str = "eci-gui-engine:latest", base_cost: float = 1.0, custom_init_script: Optional[str] = None) -> Dict[str, Any]:
         """
         GUI Pods are Stateful. We first check if the student already has a running GUI pod.
         If yes, we reuse it (Hot-Reloading will handle the rest).

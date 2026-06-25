@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Student Workspace — Polyglot ECI</title>
+  <meta name="description" content="Student Academic Workspace — run code, view assignments, track submissions." />
+  <link rel="stylesheet" href="./style.css" />
+  <!-- xterm.js for interactive terminal -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+  <style>
+    .ide-layout { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .xterm { height: 200px; }
+    #xterm-container { border-radius:var(--radius-md); overflow:hidden; background:#010409; border:1px solid var(--border); padding:10px; min-height:200px; }
+    .assignment-card { background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:18px 20px; margin-bottom:12px; transition:var(--transition); cursor:pointer; }
+    .assignment-card:hover { border-color:var(--accent); background:var(--bg-elevated); }
+    .assignment-card h3 { font-size:0.95rem; font-weight:600; margin-bottom:4px; }
+    .assignment-meta { display:flex; gap:12px; font-size:0.78rem; color:var(--text-secondary); margin-top:6px; }
+    .assignment-meta span { display:flex; align-items:center; gap:4px; }
+    .submission-result { background:var(--bg-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:14px 16px; margin-top:16px; }
+    .submission-result h4 { font-size:0.85rem; font-weight:600; margin-bottom:8px; }
+    .test-row { display:flex; align-items:center; justify-content:space-between; font-size:0.82rem; padding:4px 0; border-bottom:1px solid var(--border-subtle); }
+    .test-row:last-child { border-bottom:none; }
+    #lang-select { background:var(--bg-base); border:1px solid var(--border); color:var(--text-primary); border-radius:var(--radius-sm); padding:6px 10px; font-size:0.83rem; }
+    .run-controls { display:flex; align-items:center; gap:10px; }
+  </style>
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+<div class="app-shell">
+
+  <!-- ── SIDEBAR ────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">⚡</div>
+      <div>
+        <div class="logo-text">ECI Platform</div>
+        <div class="logo-sub">Student Workspace</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Academic</div>
+      <div class="nav-item active" data-section="my-courses" onclick="switchSection('my-courses', this)">
+        <span class="icon">📚</span> My Courses
+      </div>
+      <div class="nav-item" data-section="assignments" onclick="switchSection('assignments', this)">
+        <span class="icon">📋</span> Assignments
+        <span class="nav-badge" id="assignment-badge">0</span>
+      </div>
+      <div class="nav-item" data-section="my-submissions" onclick="switchSection('my-submissions', this)">
+        <span class="icon">📝</span> My Submissions
+      </div>
+
+      <div class="nav-section-label">Development</div>
+      <div class="nav-item" data-section="workspace" onclick="switchSection('workspace', this)">
+        <span class="icon">💻</span> Code Workspace
+      </div>
+    </nav>
+
+    <div style="padding:14px 16px; border-top:1px solid var(--border-subtle);">
+      <button class="btn btn-ghost btn-sm" onclick="Auth.logout()" style="width:100%">⎋ Logout</button>
+    </div>
+  </aside>
+
+  <!-- ── TOPBAR ─────────────────────────────────────── -->
+  <header class="topbar">
+    <span class="topbar-title">Student Academic Workspace</span>
+    <div class="user-pill" id="user-pill"></div>
+  </header>
+
+  <!-- ── MAIN CONTENT ───────────────────────────────── -->
+  <main class="main-content">
+
+    <!-- ═══════════════════════════════════════
+         SECTION: My Courses
+    ═══════════════════════════════════════ -->
+    <section id="my-courses" class="content-section">
+      <div class="page-header">
+        <h1>📚 My Enrolled Courses</h1>
+        <p>All courses you are currently enrolled in this semester.</p>
+      </div>
+
+      <div class="stats-grid" id="student-stats">
+        <div class="stat-card">
+          <div class="stat-icon">📚</div>
+          <div class="stat-value" id="stat-courses">—</div>
+          <div class="stat-label">Enrolled Courses</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📋</div>
+          <div class="stat-value" id="stat-assignments">—</div>
+          <div class="stat-label">Pending Assignments</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">✅</div>
+          <div class="stat-value" id="stat-submitted">—</div>
+          <div class="stat-label">Submitted</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🏆</div>
+          <div class="stat-value" id="stat-avg">—</div>
+          <div class="stat-label">Avg. Marks</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-header-title">Enrolled Courses</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Section</th>
+              <th>Faculty</th>
+              <th>Enrollment ID</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="courses-tbody">
+            <tr><td colspan="4" class="text-muted" style="text-align:center;padding:24px">Loading courses...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         SECTION: Assignments
+    ═══════════════════════════════════════ -->
+    <section id="assignments" class="content-section hidden">
+      <div class="page-header">
+        <h1>📋 Assignments</h1>
+        <p>Select a course to view its assignments.</p>
+      </div>
+
+      <div class="form-group mb-4">
+        <label class="form-label">Select Course</label>
+        <select id="course-select" class="form-select" style="max-width:360px" onchange="loadAssignments(this.value)">
+          <option value="">— Choose a course —</option>
+        </select>
+      </div>
+
+      <div id="assignments-list">
+        <p class="text-muted text-sm">Select a course above to view assignments.</p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         SECTION: My Submissions
+    ═══════════════════════════════════════ -->
+    <section id="my-submissions" class="content-section hidden">
+      <div class="page-header">
+        <h1>📝 My Submissions</h1>
+        <p>All code submissions you have made across all courses.</p>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-header-title">Submission History</span>
+          <button class="btn btn-ghost btn-sm" onclick="loadMySubmissions()">🔄 Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Assignment ID</th>
+              <th>Language</th>
+              <th>Status</th>
+              <th>Tests</th>
+              <th>Marks</th>
+              <th>Submitted</th>
+            </tr>
+          </thead>
+          <tbody id="submissions-tbody">
+            <tr><td colspan="6" class="text-muted" style="text-align:center;padding:24px">Loading submissions...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         SECTION: Code Workspace (Cloud IDE)
+    ═══════════════════════════════════════ -->
+    <section id="workspace" class="content-section hidden">
+      <div class="page-header">
+        <h1>💻 Code Workspace</h1>
+        <p>Write, run and debug code in your isolated cloud sandbox. Streams output in real-time via WebSocket.</p>
+      </div>
+
+      <!-- Execution Controls -->
+      <div class="card mb-4">
+        <div class="run-controls">
+          <div class="form-group" style="margin:0;flex:1">
+            <label class="form-label">Environment (Pod)</label>
+            <select id="lang-select">
+              <option value="cpp-basic">C++ Basic</option>
+              <option value="python-ds">Python / Data Science</option>
+              <option value="java-basic">Java</option>
+              <option value="node-js">Node.js</option>
+              <option value="rust-sys">Rust</option>
+              <option value="go-sys">Go</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Mode</label>
+            <select id="mode-select" class="form-select" style="width:140px">
+              <option value="batch">Batch (Quick Run)</option>
+              <option value="interactive">Interactive (stdin)</option>
+            </select>
+          </div>
+          <div style="margin-top:20px;display:flex;gap:8px">
+            <button class="btn btn-primary" onclick="runCode()" id="run-btn">▶ Run</button>
+            <button class="btn btn-ghost" onclick="clearTerminal()">🗑 Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ide-layout">
+        <!-- Monaco Code Editor -->
+        <div>
+          <div class="code-editor-wrap">
+            <div class="editor-topbar">
+              <div class="editor-dots">
+                <div class="dot dot-red"></div>
+                <div class="dot dot-yellow"></div>
+                <div class="dot dot-green"></div>
+              </div>
+              <span style="font-size:0.78rem;color:var(--text-muted)">main.cpp</span>
+              <div></div>
+            </div>
+            <div id="monaco-container"></div>
+          </div>
+        </div>
+
+        <!-- Terminal Output -->
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span style="font-size:0.85rem;font-weight:600">Terminal Output</span>
+            <span id="exec-status" class="badge badge-blue" style="display:none">Queued</span>
+          </div>
+          <div id="xterm-container"></div>
+
+          <!-- Stdin input for interactive mode -->
+          <div id="stdin-panel" class="hidden mt-2">
+            <div class="flex gap-2">
+              <input type="text" id="stdin-input" class="form-input" placeholder="Type stdin input and press Enter..." />
+              <button class="btn btn-ghost" onclick="sendStdin()">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submission Panel (appears if assignment context is set) -->
+      <div id="submit-panel" class="hidden mt-4 card">
+        <div class="card-title">📤 Submit for Assignment</div>
+        <div class="card-sub mt-1" id="submit-assignment-title"></div>
+        <div class="flex gap-2 mt-3">
+          <button class="btn btn-success" onclick="submitForAssignment()" id="submit-btn">Submit Code</button>
+          <button class="btn btn-ghost" onclick="clearSubmissionContext()">Cancel</button>
+        </div>
+        <div id="submission-result" class="hidden"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Monaco Editor CDN -->
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs/loader.js"></script>
+<!-- xterm.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+<!-- Shared API -->
+<script src="./api.js"></script>
+
+<script>
+// ── State ────────────────────────────────────────────
+let monacoEditor   = null;
+let xtermInstance  = null;
+let activeWs       = null;
+let enrolledCourses = [];
+let submissionContext = null; // {assignmentId, assignmentTitle}
+
+// ── Init ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!Auth.isLoggedIn()) { window.location.href = './login.html'; return; }
+
+  // Force role
+  const user = Auth.getUser();
+  if (user.role !== 'student') {
+    showToast('This dashboard is for students only. Redirecting...', 'error');
+    setTimeout(() => { window.location.href = './teacher_dashboard.html'; }, 1500);
+    return;
+  }
+
+  renderUserPill();
+  initMonaco();
+  initXterm();
+  await loadCourses();
+});
+
+// ── Monaco Editor ─────────────────────────────────────
+function initMonaco() {
+  require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs' } });
+  require(['vs/editor/editor.main'], function () {
+    monacoEditor = monaco.editor.create(document.getElementById('monaco-container'), {
+      value: `#include <iostream>\nusing namespace std;\n\nint main() {\n    string name;\n    cin >> name;\n    cout << "Hello, " << name << "!" << endl;\n    return 0;\n}`,
+      language: 'cpp',
+      theme: 'vs-dark',
+      fontSize: 14,
+      fontFamily: 'JetBrains Mono, monospace',
+      minimap: { enabled: false },
+      scrollBeyondLastLine: false,
+      lineNumbers: 'on',
+      renderLineHighlight: 'all',
+      padding: { top: 12 }
+    });
+  });
+
+  document.getElementById('lang-select').addEventListener('change', function() {
+    if (!monacoEditor) return;
+    const langMap = {
+      'cpp-basic': 'cpp', 'python-ds': 'python', 'java-basic': 'java',
+      'node-js': 'javascript', 'rust-sys': 'rust', 'go-sys': 'go'
+    };
+    monaco.editor.setModelLanguage(monacoEditor.getModel(), langMap[this.value] || 'plaintext');
+  });
+}
+
+// ── xterm.js Terminal ─────────────────────────────────
+function initXterm() {
+  xtermInstance = new Terminal({
+    theme: { background: '#010409', foreground: '#4ec9b0', cursor: '#2f81f7', selection: 'rgba(47,129,247,0.3)' },
+    fontFamily: 'JetBrains Mono, monospace',
+    fontSize: 13,
+    rows: 12,
+    cursorBlink: true,
+  });
+  xtermInstance.open(document.getElementById('xterm-container'));
+  xtermInstance.writeln('\x1b[36mPolyglot ECI Terminal\x1b[0m — Ready for execution.');
+}
+
+function clearTerminal() {
+  xtermInstance?.clear();
+  xtermInstance?.writeln('\x1b[36mPolyglot ECI Terminal\x1b[0m — Cleared.');
+}
+
+// ── Run Code ──────────────────────────────────────────
+function runCode() {
+  if (!monacoEditor) { showToast('Editor not ready yet', 'warning'); return; }
+  if (activeWs) { activeWs.close(); activeWs = null; }
+
+  const code     = monacoEditor.getValue();
+  const envType  = document.getElementById('lang-select').value;
+  const mode     = document.getElementById('mode-select').value;
+  const user     = Auth.getUser();
+
+  const statusEl = document.getElementById('exec-status');
+  statusEl.style.display = 'inline-flex';
+
+  const runBtn = document.getElementById('run-btn');
+  runBtn.textContent = '⏳ Running...';
+  runBtn.disabled = true;
+
+  xtermInstance?.writeln('\n\x1b[33m⚡ Sending code to execution engine...\x1b[0m');
+
+  const payload = {
+    student_id: user.userId,
+    course_code: 'ECI-WORKSPACE',
+    env_type: envType,
+    source_code: code,
+    mode: mode,
+  };
+
+  const stdinPanel = document.getElementById('stdin-panel');
+
+  activeWs = createExecutionSocket(payload, {
+    onQueued: () => {
+      statusEl.textContent = '⏳ Queued';
+      statusEl.className = 'badge badge-yellow';
+      xtermInstance?.writeln('\x1b[34m[GATEWAY]\x1b[0m Request queued. Waiting for cluster...');
+    },
+    onProvisioning: () => {
+      statusEl.textContent = '🔧 Provisioning';
+      statusEl.className = 'badge badge-blue';
+      xtermInstance?.writeln('\x1b[34m[ORCHESTRATOR]\x1b[0m Spinning up your K8s sandbox...');
+    },
+    onExecuting: (data) => {
+      statusEl.textContent = '▶ Executing';
+      statusEl.className = 'badge badge-purple';
+      xtermInstance?.writeln(`\x1b[34m[ENGINE]\x1b[0m Sandbox ready (pod: ${data.pod_name || 'wasm'}). Running...`);
+      if (mode === 'interactive') stdinPanel?.classList.remove('hidden');
+    },
+    onComplete: (data) => {
+      statusEl.textContent = '✅ Done';
+      statusEl.className = 'badge badge-green';
+      runBtn.textContent = '▶ Run';
+      runBtn.disabled = false;
+      stdinPanel?.classList.add('hidden');
+
+      xtermInstance?.writeln('\n\x1b[32m──── STDOUT ────\x1b[0m');
+      (data.stdout || '(no output)').split('\n').forEach(line => xtermInstance?.writeln(line));
+      if (data.stderr) {
+        xtermInstance?.writeln('\n\x1b[31m──── STDERR ────\x1b[0m');
+        data.stderr.split('\n').forEach(line => xtermInstance?.writeln(`\x1b[31m${line}\x1b[0m`));
+      }
+      const timeMs = data.execution_time_ms || '—';
+      xtermInstance?.writeln(`\n\x1b[90m[Execution time: ${timeMs}ms | Exit: ${data.exit_code ?? 0}]\x1b[0m`);
+    },
+    onError: (data) => {
+      statusEl.textContent = '❌ Error';
+      statusEl.className = 'badge badge-red';
+      runBtn.textContent = '▶ Run';
+      runBtn.disabled = false;
+      stdinPanel?.classList.add('hidden');
+      xtermInstance?.writeln(`\n\x1b[31m[ERROR] ${data.message}\x1b[0m`);
+      showToast(data.message || 'Execution error', 'error');
+    },
+    onClose: () => { activeWs = null; }
+  });
+}
+
+function sendStdin() {
+  const input = document.getElementById('stdin-input');
+  if (!activeWs || !input.value) return;
+  activeWs.send(JSON.stringify({ stdin_data: input.value + '\n' }));
+  xtermInstance?.writeln(`\x1b[90m> ${input.value}\x1b[0m`);
+  input.value = '';
+}
+
+// ── Load Courses ──────────────────────────────────────
+async function loadCourses() {
+  try {
+    enrolledCourses = await api.student.getCourses();
+    document.getElementById('stat-courses').textContent = enrolledCourses.length;
+
+    const tbody = document.getElementById('courses-tbody');
+    if (!enrolledCourses.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:24px">No enrolled courses found.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = enrolledCourses.map(c => `
+      <tr>
+        <td><span class="badge badge-blue">${c.section_number}</span></td>
+        <td class="font-mono text-sm">${c.faculty_id.slice(0,8)}...</td>
+        <td class="font-mono text-sm" style="color:var(--text-muted)">${c.enrollment_id.slice(0,12)}...</td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick="goToAssignments('${c.course_offering_id}')">
+            📋 View Assignments
+          </button>
+        </td>
+      </tr>
+    `).join('');
+
+    // Populate course select
+    const sel = document.getElementById('course-select');
+    sel.innerHTML = '<option value="">— Choose a course —</option>';
+    enrolledCourses.forEach(c => {
+      sel.innerHTML += `<option value="${c.course_offering_id}">${c.section_number}</option>`;
+    });
+
+    // Load submission stats
+    const subs = await api.student.mySubmissions();
+    document.getElementById('stat-submitted').textContent = subs.length;
+    const avg = subs.length
+      ? (subs.reduce((a,s) => a + (s.marks_awarded || 0), 0) / subs.length).toFixed(1)
+      : '—';
+    document.getElementById('stat-avg').textContent = avg;
+
+  } catch(e) { showToast('Failed to load courses: ' + e.message, 'error'); }
+}
+
+async function goToAssignments(courseId) {
+  switchSection('assignments', document.querySelector('[data-section="assignments"]'));
+  document.getElementById('course-select').value = courseId;
+  await loadAssignments(courseId);
+}
+
+// ── Load Assignments ─────────────────────────────────
+async function loadAssignments(courseId) {
+  if (!courseId) return;
+  const container = document.getElementById('assignments-list');
+  container.innerHTML = '<p class="text-muted text-sm">Loading assignments...</p>';
+  try {
+    const assignments = await api.student.getAssignments(courseId);
+    document.getElementById('assignment-badge').textContent = assignments.length;
+    document.getElementById('stat-assignments').textContent = assignments.length;
+
+    if (!assignments.length) {
+      container.innerHTML = '<p class="text-muted text-sm">No published assignments for this course yet.</p>';
+      return;
+    }
+
+    container.innerHTML = assignments.map(a => `
+      <div class="assignment-card" onclick="openAssignment('${a.id}', '${encodeURIComponent(a.title)}', '${a.allowed_pod_id || 'cpp-basic'}')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <h3>${a.title}</h3>
+            <p class="text-sm text-muted mt-1">${a.description || 'No description.'}</p>
+          </div>
+          <span class="badge badge-blue">📝 Submit</span>
+        </div>
+        <div class="assignment-meta">
+          <span>🏆 Max Marks: <strong>${a.max_marks}</strong></span>
+          <span>⏰ Due: <strong>${a.due_date ? new Date(a.due_date).toLocaleDateString() : 'No deadline'}</strong></span>
+          <span>⚙️ Env: <strong>${a.allowed_pod_id || 'Any'}</strong></span>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { showToast('Failed to load assignments: ' + e.message, 'error'); }
+}
+
+// ── Open Assignment in Workspace ──────────────────────
+function openAssignment(assignmentId, titleEncoded, podId) {
+  const title = decodeURIComponent(titleEncoded);
+  submissionContext = { assignmentId, title };
+  if (podId) document.getElementById('lang-select').value = podId;
+
+  switchSection('workspace', document.querySelector('[data-section="workspace"]'));
+
+  const panel = document.getElementById('submit-panel');
+  panel.classList.remove('hidden');
+  document.getElementById('submit-assignment-title').textContent = `Assignment: ${title}`;
+  showToast(`Assignment "${title}" loaded. Write your code and click Submit.`, 'info');
+}
+
+function clearSubmissionContext() {
+  submissionContext = null;
+  document.getElementById('submit-panel').classList.add('hidden');
+}
+
+// ── Submit Assignment ─────────────────────────────────
+async function submitForAssignment() {
+  if (!submissionContext || !monacoEditor) return;
+
+  const code     = monacoEditor.getValue();
+  const language = document.getElementById('lang-select').value;
+  const submitBtn = document.getElementById('submit-btn');
+
+  submitBtn.textContent = '⏳ Submitting...';
+  submitBtn.disabled = true;
+
+  try {
+    const result = await api.student.submitAssignment(submissionContext.assignmentId, {
+      source_code: code,
+      language: language,
+    });
+
+    const resultEl = document.getElementById('submission-result');
+    resultEl.classList.remove('hidden');
+    resultEl.innerHTML = `
+      <div class="submission-result">
+        <h4>📊 Submission Result</h4>
+        <div class="test-row">
+          <span>Status</span>
+          <span class="badge ${result.status === 'submitted' ? 'badge-blue' : 'badge-green'}">${result.status}</span>
+        </div>
+        <div class="test-row">
+          <span>Tests Passed</span>
+          <span style="color:var(--success);font-weight:600">${result.tests_passed} / ${result.tests_total}</span>
+        </div>
+        <div class="test-row">
+          <span>Marks Awarded</span>
+          <span style="color:var(--warning);font-weight:700">${result.marks_awarded?.toFixed(1)} pts</span>
+        </div>
+        <div class="test-row">
+          <span>Message</span>
+          <span class="text-muted text-sm">${result.message}</span>
+        </div>
+      </div>
+    `;
+    showToast('Code submitted successfully!', 'success');
+  } catch(e) {
+    showToast('Submission failed: ' + e.message, 'error');
+  } finally {
+    submitBtn.textContent = 'Submit Code';
+    submitBtn.disabled = false;
+  }
+}
+
+// ── Load My Submissions ───────────────────────────────
+async function loadMySubmissions() {
+  try {
+    const subs = await api.student.mySubmissions();
+    const tbody = document.getElementById('submissions-tbody');
+
+    if (!subs.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:24px">No submissions yet.</td></tr>';
+      return;
+    }
+
+    const statusBadge = (s) => {
+      const map = { submitted:'badge-blue', graded:'badge-green', late:'badge-red', resubmitted:'badge-purple' };
+      return `<span class="badge ${map[s] || 'badge-blue'}">${s}</span>`;
+    };
+
+    tbody.innerHTML = subs.map(s => `
+      <tr>
+        <td class="font-mono text-sm" style="color:var(--text-muted)">${s.assignment_id.slice(0,10)}...</td>
+        <td><span class="badge badge-purple">${s.language}</span></td>
+        <td>${statusBadge(s.status)}</td>
+        <td style="color:var(--success)">${s.tests_passed}/${s.tests_total}</td>
+        <td style="font-weight:600;color:var(--warning)">${s.marks_awarded?.toFixed(1) ?? '—'}</td>
+        <td class="text-sm text-muted">${s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : '—'}</td>
+      </tr>
+    `).join('');
+  } catch(e) { showToast('Failed to load submissions: ' + e.message, 'error'); }
+}
+
+// ── Navigation ────────────────────────────────────────
+function switchSection(id, navEl) {
+  document.querySelectorAll('.content-section').forEach(s => s.classList.add('hidden'));
+  document.getElementById(id)?.classList.remove('hidden');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  navEl?.classList.add('active');
+
+  // Lazy load
+  if (id === 'my-submissions') loadMySubmissions();
+}
+
+// stdin on Enter
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && document.activeElement.id === 'stdin-input') sendStdin();
+});
+</script>
+
+</body>
+</html>

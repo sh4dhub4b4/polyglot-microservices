@@ -15,12 +15,22 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/courses/{faculty_id}")
+@router.get("/courses/{faculty_id}",
+    summary="List courses for a faculty member",
+    description="Returns all course offerings taught by the specified faculty member.")
 def get_faculty_courses(faculty_id: UUID, db: Session = Depends(get_db)):
     courses = db.query(CourseOfferingORM).filter(CourseOfferingORM.faculty_id == faculty_id).all()
-    return [{"id": c.id, "section_number": c.section_number, "max_capacity": c.max_capacity} for c in courses]
+    return [{"id": str(c.id), "section_number": c.section_number, "max_capacity": c.max_capacity} for c in courses]
 
-@router.post("/env/customize", response_model=CustomPodResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/env/customize",
+    response_model=CustomPodResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a custom sandbox environment",
+    description="""
+    Faculty can create a customized sandbox environment by extending a base pod image.
+    This allows injecting custom initialization scripts and setting compute limits
+    for specific assignments or projects.
+    """)
 def customize_environment(request: CustomPodRequest, db: Session = Depends(get_db)):
     # 1. Fetch the base image catalog entry
     base_pod = db.query(PodCatalogORM).filter(PodCatalogORM.id == request.base_image).first()

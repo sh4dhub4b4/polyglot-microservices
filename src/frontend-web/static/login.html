@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sign In — Polyglot ECI Platform</title>
+  <meta name="description" content="Sign in to your university's Polyglot ECI Academic Cloud Platform."/>
+  <link rel="stylesheet" href="./style.css"/>
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--bg-base); }
+    .login-wrap { width:100%; max-width:420px; padding:20px; }
+    .login-card {
+      background:var(--bg-surface);
+      border:1px solid var(--border);
+      border-radius:var(--radius-xl);
+      padding:36px 32px;
+      box-shadow:var(--shadow-lg);
+    }
+    .login-logo { text-align:center; margin-bottom:28px; }
+    .login-logo-icon {
+      width:60px; height:60px;
+      background:linear-gradient(135deg, var(--accent), var(--purple));
+      border-radius:18px;
+      display:inline-flex; align-items:center; justify-content:center;
+      font-size:1.8rem; margin-bottom:12px;
+    }
+    .login-logo h1 { font-size:1.3rem; font-weight:700; }
+    .login-logo p  { font-size:0.82rem; color:var(--text-secondary); margin-top:4px; }
+    .role-tabs { display:flex; gap:8px; margin-bottom:24px; }
+    .role-tab {
+      flex:1; padding:10px; border-radius:var(--radius-md);
+      background:var(--bg-elevated); border:1px solid var(--border);
+      font-size:0.85rem; font-weight:500; cursor:pointer; transition:var(--transition);
+      text-align:center; color:var(--text-secondary);
+    }
+    .role-tab.active { border-color:var(--accent); background:var(--accent-glow); color:var(--accent); }
+    .divider { text-align:center; color:var(--text-muted); font-size:0.78rem; margin:16px 0; }
+    .demo-presets { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:20px; }
+    .preset-btn {
+      padding:8px 12px; border-radius:var(--radius-sm);
+      border:1px solid var(--border); background:var(--bg-elevated);
+      color:var(--text-secondary); font-size:0.78rem; cursor:pointer; transition:var(--transition);
+      text-align:left;
+    }
+    .preset-btn:hover { border-color:var(--accent); color:var(--text-primary); background:var(--accent-glow); }
+    .preset-btn .preset-name { font-weight:600; display:block; margin-bottom:2px; }
+    .preset-btn .preset-meta { color:var(--text-muted); font-size:0.72rem; }
+  </style>
+</head>
+<body>
+<div id="toast-container"></div>
+
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">⚡</div>
+      <h1>Polyglot ECI Platform</h1>
+      <p>Educational Code Infrastructure — University Portal</p>
+    </div>
+
+    <!-- Role selector -->
+    <div class="role-tabs">
+      <div class="role-tab active" id="tab-student" onclick="setRole('student')">🎓 Student</div>
+      <div class="role-tab" id="tab-faculty" onclick="setRole('faculty')">👨‍🏫 Faculty</div>
+    </div>
+
+    <!-- Auth mode tabs -->
+    <div class="role-tabs" style="margin-bottom:16px">
+      <div class="role-tab active" id="tab-login" onclick="setAuthMode('login')">Sign In</div>
+      <div class="role-tab" id="tab-register" onclick="setAuthMode('register')">Register</div>
+    </div>
+
+    <!-- Demo preset accounts -->
+    <p class="text-sm text-muted mb-4">Quick Demo (auto-registers if needed):</p>
+    <div class="demo-presets" id="demo-presets">
+      <!-- populated by JS -->
+    </div>
+
+    <div class="divider">— or enter manually —</div>
+
+    <!-- Login form -->
+    <form id="auth-form" onsubmit="handleLogin(event)">
+      <div class="form-group" id="name-field" style="display:none">
+        <label class="form-label">Display Name</label>
+        <input type="text" id="display-name" class="form-input" placeholder="Your full name" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" id="email" class="form-input" placeholder="you@university.edu" required />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="password" class="form-input" placeholder="Enter password" required minlength="4" />
+      </div>
+      <input type="hidden" id="role-value" value="student" />
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px" id="auth-submit-btn">
+        Sign In →
+      </button>
+    </form>
+  </div>
+
+  <p style="text-align:center;font-size:0.75rem;color:var(--text-muted);margin-top:16px">
+    JWT-based authentication with Bearer tokens.
+  </p>
+</div>
+
+<script src="./api.js"></script>
+<script>
+const DEMO_ACCOUNTS = {
+  student: [
+    { label:'Rahim Hossain',  email:'rahim@buet.edu',   name:'Rahim Hossain' },
+    { label:'Nadia Islam',    email:'nadia@buet.edu',   name:'Nadia Islam' },
+  ],
+  faculty: [
+    { label:'Dr. Rahman', email:'rahman@buet.edu',    name:'Dr. Rahman' },
+    { label:'Prof. Karim', email:'karim@buet.edu',    name:'Prof. Karim' },
+  ]
+};
+
+const DEMO_PASSWORD = 'demo1234';
+
+let currentRole = 'student';
+let authMode = 'login';
+
+function setRole(role) {
+  currentRole = role;
+  document.getElementById('role-value').value = role;
+  document.getElementById('tab-student').classList.toggle('active', role === 'student');
+  document.getElementById('tab-faculty').classList.toggle('active', role === 'faculty');
+  renderPresets();
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  document.getElementById('tab-login').classList.toggle('active', mode === 'login');
+  document.getElementById('tab-register').classList.toggle('active', mode === 'register');
+  document.getElementById('name-field').style.display = mode === 'register' ? 'block' : 'none';
+  document.getElementById('auth-submit-btn').textContent = mode === 'register' ? 'Create Account →' : 'Sign In →';
+}
+
+function renderPresets() {
+  const accounts = DEMO_ACCOUNTS[currentRole] || [];
+  const container = document.getElementById('demo-presets');
+  container.innerHTML = accounts.map(a => `
+    <button class="preset-btn" type="button" onclick="loginPreset('${a.email}','${a.name}')">
+      <span class="preset-name">${a.label}</span>
+      <span class="preset-meta">${a.email}</span>
+    </button>
+  `).join('');
+}
+
+function loginPreset(email, name) {
+  document.getElementById('email').value = email;
+  document.getElementById('display-name').value = name;
+  document.getElementById('password').value = DEMO_PASSWORD;
+  handleLoginDirect(email, DEMO_PASSWORD, name, currentRole);
+}
+
+async function handleLoginDirect(email, password, displayName, role) {
+  try {
+    const user = await Auth.login(email, password);
+    showToast(`Welcome, ${user.displayName}!`, 'success');
+    setTimeout(() => {
+      window.location.href = role === 'faculty' ? './teacher_dashboard.html' : './student_workspace.html';
+    }, 800);
+  } catch (err) {
+    // If login fails, try auto-registering the demo account
+    try {
+      const user = await Auth.register(email, password, displayName, role);
+      showToast(`Account created! Welcome, ${user.displayName}!`, 'success');
+      setTimeout(() => {
+        window.location.href = role === 'faculty' ? './teacher_dashboard.html' : './student_workspace.html';
+      }, 800);
+    } catch (regErr) {
+      showToast(regErr.message || 'Authentication failed', 'error');
+    }
+  }
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const email       = document.getElementById('email').value.trim();
+  const password    = document.getElementById('password').value;
+  const displayName = document.getElementById('display-name').value.trim();
+  const role        = document.getElementById('role-value').value;
+
+  if (!email || !password) { showToast('Email and password required.', 'error'); return; }
+
+  if (authMode === 'register') {
+    if (!displayName) { showToast('Display name required for registration.', 'error'); return; }
+    try {
+      const user = await Auth.register(email, password, displayName, role);
+      showToast(`Account created! Welcome, ${user.displayName}!`, 'success');
+      setTimeout(() => {
+        window.location.href = role === 'faculty' ? './teacher_dashboard.html' : './student_workspace.html';
+      }, 800);
+    } catch (err) {
+      showToast(err.message || 'Registration failed', 'error');
+    }
+  } else {
+    try {
+      const user = await Auth.login(email, password);
+      showToast(`Welcome, ${user.displayName}!`, 'success');
+      setTimeout(() => {
+        window.location.href = role === 'faculty' ? './teacher_dashboard.html' : './student_workspace.html';
+      }, 800);
+    } catch (err) {
+      showToast(err.message || 'Login failed', 'error');
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (Auth.isLoggedIn()) {
+    const u = Auth.getUser();
+    window.location.href = u.role === 'faculty' ? './teacher_dashboard.html' : './student_workspace.html';
+    return;
+  }
+  renderPresets();
+});
+</script>
+</body>
+</html>

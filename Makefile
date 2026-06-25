@@ -165,29 +165,56 @@ all-local:
 # Dev Workflow (Phase 1.5 - Hot Reloading)
 # ============================================================
 dev-tunnel:
-	@echo "🚇 Establishing Redis Tunnel (Port 6379)..."
+	@echo "Establishing Redis Tunnel (Port 6379)..."
 	@kubectl port-forward svc/redis-svc 6379:6379 -n eci-system || echo "Tunnel may already be running"
 
+dev-infra:
+	@echo "Starting infrastructure (PostgreSQL + Redis)..."
+	-docker stop polyglot-pg-test 2>/dev/null || true
+	-docker rm polyglot-pg-test 2>/dev/null || true
+	docker compose -f compose/docker-compose.local.yml up -d
+	@echo "Waiting for PostgreSQL to be ready..."
+	@sleep 3
+	@echo "Done. Run 'make dev-seed', then 'make dev-gateway'."
+
+dev-infra-down:
+	@echo "Stopping infrastructure..."
+	docker compose -f compose/docker-compose.local.yml down
+	@echo "Done."
+
+dev-seed:
+	@echo "Seeding PostgreSQL catalog..."
+	.venv/Scripts/python.exe scripts/seed_db.py
+	@echo "Seeding local Redis..."
+	.venv/Scripts/python.exe scripts/seed_redis.py
+	@echo "Done."
+
 dev-gateway:
-	@echo "🚀 Starting Local API Gateway (Hot Reload Enabled)..."
-	$env:REDIS_HOST="localhost" ; $env:ENV="development" ; cd src/api-gateway && uvicorn main:app --app-dir src --host 0.0.0.0 --port 8080 --reload
+	@echo "Starting Local API Gateway (Hot Reload Enabled)..."
+	cd src/api-gateway && REDIS_HOST=localhost ENV=development DATABASE_URL='postgresql://postgres:postgres@localhost:5432/polyglot' ../../.venv/Scripts/python.exe -m uvicorn main:app --app-dir src --host 0.0.0.0 --port 8080 --reload
 
 dev-orchestrator:
-	@echo "🚀 Starting Local Environment Orchestrator (Hot Reload Enabled)..."
-	$env:REDIS_HOST="localhost" ; $env:ENV="development" ; cd src/environment-orchestrator && python src/worker.py
+	@echo "Starting Local Environment Orchestrator (Hot Reload Enabled)..."
+	cd src/environment-orchestrator && REDIS_HOST=localhost ENV=development ../../.venv/Scripts/python.exe src/worker.py
 
 dev:
 	@echo "🌐 Launching Phase 1.5 Master Dev Environment..."
 	@powershell -ExecutionPolicy Bypass -File scripts/start_dev.ps1
 
+export PYTHONIOENCODING := utf-8
+
 tst:
+	@echo "📦 Installing api-gateway dependencies..."
+	uv pip install -r src/api-gateway/requirements.txt
 	@echo "🧹 Flushing Redis Queue to prevent processing old payloads..."
 	kubectl exec deployment/redis -n eci-system -- redis-cli flushall || true
 	@echo "🌱 Re-seeding PodCatalog to Redis Cache..."
 	python scripts/seed_db.py
 	@echo "🚀 Running the e2e test script..."
-	$env:PYTHONIOENCODING="utf-8" ; python test_e2e_gauntlet.py || set PYTHONIOENCODING=utf-8 && python test_e2e_gauntlet.py
+	python test_e2e_gauntlet.py
 
+# ============================================================
+# Garbage Collection (Phase 1.1 & 1.2)
 # ============================================================
 # Garbage Collection (Phase 1.1 & 1.2)
 # ============================================================

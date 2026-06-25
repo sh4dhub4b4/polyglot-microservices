@@ -7,12 +7,21 @@ interface CodeEditorProps {
   onChange: (value: string | undefined) => void;
 }
 
+const LANG_MAP: Record<string, string> = {
+  'python-ds': 'python',
+  'python-wasm': 'python',
+  'cpp-basic': 'cpp',
+  'go-sys': 'go',
+  'node-js': 'javascript',
+  'rust-sys': 'rust',
+};
+
 export const CodeEditor: React.FC<CodeEditorProps> = ({ language, value, onChange }) => {
   return (
     <div className="w-full h-full border border-gray-700 rounded-md overflow-hidden">
       <Editor
         height="100%"
-        language={language}
+        language={LANG_MAP[language] || language}
         theme="vs-dark"
         value={value}
         onChange={onChange}
