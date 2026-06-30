@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polyglot IDE</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#121212;--bg2:#1e1e1e;--bg3:#2d2d2d;--bg4:#252525;--border:#333;--fg:#e0e0e0;--fg2:#999;--accent:#aa3bff;--accent-hover:#912ee6;--red:#e53935;--green:#43a047;--yellow:#fdd835;--blue:#1e88e5;--font:'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;--fs:13px}
+html,body{height:100%;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:var(--fs);overflow:hidden}
+input,select,textarea,button{font-family:inherit;font-size:inherit}
+#app{display:grid;height:100vh;grid-template-rows:auto 1fr auto auto;grid-template-columns:220px 1fr;grid-template-areas:"toolbar toolbar" "files editor" "output output" "status status"}
+#toolbar{grid-area:toolbar;display:flex;align-items:center;gap:12px;padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap}
+#toolbar .brand{font-weight:700;font-size:15px;color:var(--accent);margin-right:8px}
+#toolbar select{background:var(--bg3);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:4px 8px;outline:none;cursor:pointer}
+#toolbar select:focus{border-color:var(--accent)}
+#toolbar button{padding:4px 14px;border:none;border-radius:4px;cursor:pointer;font-weight:600;transition:opacity .15s}
+#toolbar button:hover{opacity:.85}
+#toolbar .run-btn{background:var(--accent);color:#fff}
+#toolbar .stop-btn{background:var(--red);color:#fff}
+#toolbar .file-actions{display:flex;gap:4px;margin-left:auto}
+#toolbar .file-actions button{background:var(--bg3);color:var(--fg2);padding:2px 8px;font-size:12px}
+#toolbar .file-actions button:hover{color:var(--fg);background:var(--border)}
+#toolbar .file-label{color:var(--fg2);font-size:12px;padding:2px 8px;background:var(--bg3);border-radius:3px}
+#files{grid-area:files;background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+#files .header{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--fg2);text-transform:uppercase;letter-spacing:.5px}
+#files .header button{background:none;border:none;color:var(--fg2);cursor:pointer;font-size:16px;line-height:1;padding:0 2px}
+#files .header button:hover{color:var(--accent)}
+#files .file-item{display:flex;align-items:center;padding:5px 12px;cursor:pointer;font-size:12px;color:var(--fg2);gap:6px}
+#files .file-item:hover{background:var(--bg4);color:var(--fg)}
+#files .file-item.active{background:var(--bg3);color:var(--fg)}
+#files .file-item .icon{font-size:14px;width:18px;text-align:center}
+#files .file-item .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#files .file-item .file-ops{display:none;gap:2px;margin-left:auto}
+#files .file-item:hover .file-ops{display:flex}
+#files .file-item .file-ops button{background:none;border:none;color:var(--fg2);cursor:pointer;font-size:11px;padding:0 3px;line-height:1}
+#files .file-item .file-ops button:hover{color:var(--fg)}
+#files .file-item .file-ops button.del-btn:hover{color:var(--red)}
+#files .file-item input{background:var(--bg3);border:1px solid var(--accent);border-radius:2px;color:var(--fg);padding:2px 4px;width:100%;outline:none}
+#files .new-file-form{display:flex;padding:4px 12px;gap:4px;border-bottom:1px solid var(--border)}
+#files .new-file-form input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:2px;color:var(--fg);padding:3px 6px;outline:none;font-size:12px}
+#files .new-file-form input:focus{border-color:var(--accent)}
+#files .new-file-form button{background:var(--accent);color:#fff;border:none;border-radius:2px;padding:3px 8px;cursor:pointer;font-size:11px}
+#editor{grid-area:editor;overflow:hidden;position:relative}
+#editor .empty-msg{display:flex;align-items:center;justify-content:center;height:100%;color:var(--fg2);font-size:14px}
+#output{grid-area:output;display:flex;flex-direction:column;border-top:1px solid var(--border);background:var(--bg2);min-height:120px;max-height:300px}
+#output .meta{display:flex;gap:16px;padding:4px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--fg2)}
+#output .meta .exit{color:var(--fg2)}
+#terminal-container{flex:1;min-height:150px;overflow:hidden;background:#0d0d0d}
+#terminal-container .xterm-viewport{scrollbar-width:thin;scrollbar-color:#333 #0d0d0d}
+#wasm-bar{display:none;gap:16px;align-items:center;padding:4px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--fg2);background:var(--bg3)}
+#output .meta .exit.ok{color:var(--green)}
+#output .meta .exit.err{color:var(--red)}
+#output .meta .time{color:var(--fg2)}
+#status{grid-area:status;display:flex;align-items:center;gap:8px;padding:3px 12px;background:var(--bg2);border-top:1px solid var(--border);font-size:11px;color:var(--fg2)}
+#status .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+#status .dot.idle{background:var(--fg2)}
+#status .dot.queued{background:var(--yellow)}
+#status .dot.executing{background:var(--blue);animation:pulse 1s infinite}
+#status .dot.completed{background:var(--green)}
+#status .dot.error{background:var(--red)}
+#status .msg{flex:1}
+#status .stats{text-align:right}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@media(max-width:800px){#app{grid-template-columns:1fr;grid-template-areas:"toolbar" "files" "editor" "output" "status"}#files{max-height:150px;border-right:none;border-bottom:1px solid var(--border)}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar">
+    <span class="brand">◆ Polyglot IDE</span>
+    <select id="langSelect"></select>
+    <button class="run-btn" id="runBtn">▶ Run</button>
+    <button class="stop-btn" id="stopBtn" style="display:none">■ Stop</button>
+    <span class="file-label" id="fileLabel">main.cpp</span>
+    <div class="file-actions">
+      <button id="addFileBtn" title="New file">+</button>
+      <button id="renameFileBtn" title="Rename file">✎</button>
+      <button id="delFileBtn" title="Delete file">×</button>
+    </div>
+  </div>
+  <div id="files">
+    <div class="header"><span>Files</span><button id="addFileBtn2">+</button></div>
+    <div class="new-file-form" id="newFileForm" style="display:none">
+      <input id="newFileName" placeholder="main.py" autofocus>
+      <button id="confirmAdd">Add</button>
+    </div>
+    <div id="fileList"></div>
+  </div>
+  <div id="editor"><div class="empty-msg">Loading editor...</div></div>
+  <div id="output">
+    <div id="terminal-container"></div>
+    <div id="wasm-bar">
+      <span id="wasm-info"></span>
+      <a id="wasm-link" style="color:var(--accent);cursor:pointer;text-decoration:underline;font-size:12px">⬇ Download</a>
+    </div>
+    <div class="meta" id="outputMeta">
+      <span class="exit" id="exitCode">Exit: —</span>
+      <span class="time" id="execTime">Time: —</span>
+    </div>
+  </div>
+  <div id="status">
+    <span class="dot idle" id="statusDot"></span>
+    <span class="msg" id="statusMsg">Ready</span>
+    <span class="stats" id="statusStats"></span>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script>
+// ─── LANG_CONFIG ───
+const LANG_CONFIG = {
+  cpp:    { label:'C++',     env_type:'cpp-basic',     language:'cpp',       ext:'.cpp',  monaco:'cpp',       defaultFile:'main.cpp',
+    template:`#include <iostream>\n\nint main() {\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}\n` },
+  c:      { label:'C',       env_type:'cpp-basic',     language:'cpp',       ext:'.c',    monaco:'c',         defaultFile:'main.c',
+    template:`#include <stdio.h>\n\nint main() {\n    printf("Hello, World!\\n");\n    return 0;\n}\n` },
+  python: { label:'Python',  env_type:'python-ds',     language:'python',    ext:'.py',   monaco:'python',    defaultFile:'main.py',
+    template:`print("Hello, World!")\n` },
+  java:   { label:'Java',    env_type:'java-basic',    language:'java',      ext:'.java', monaco:'java',      defaultFile:'Main.java',
+    template:`public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}\n` },
+  csharp: { label:'C#',      env_type:'csharp-dotnet', language:'csharp',    ext:'.cs',   monaco:'csharp',    defaultFile:'Program.cs',
+    template:`Console.WriteLine("Hello, World!");\n` },
+  node:   { label:'Node.js', env_type:'node-js',       language:'javascript',ext:'.js',   monaco:'javascript',defaultFile:'main.js',
+    template:`console.log("Hello, World!");\n` },
+  go:     { label:'Go',      env_type:'go-sys',        language:'go',        ext:'.go',   monaco:'go',        defaultFile:'main.go',
+    template:`package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello, World!")\n}\n` },
+  rust:   { label:'Rust',    env_type:'rust-sys',      language:'rust',      ext:'.rs',   monaco:'rust',      defaultFile:'main.rs',
+    template:`fn main() {\n    println!("Hello, World!");\n}\n` },
+  wasm_cpp:  { label:'WASM C++',  env_type:'wasm-cpp',  language:'cpp',       ext:'.cpp',  monaco:'cpp',       defaultFile:'main.cpp',
+    template:`#include <emscripten.h>\n\nint main() {\n    return 0;\n}\n` },
+  wasm_rust: { label:'WASM Rust', env_type:'wasm-rust', language:'rust',      ext:'.rs',   monaco:'rust',      defaultFile:'main.rs',
+    template:`fn main() {}\n` },
+  wasm_go:   { label:'WASM Go',   env_type:'wasm-go',   language:'go',        ext:'.go',   monaco:'go',        defaultFile:'main.go',
+    template:`package main\n\nfunc main() {}\n` },
+}
+const WASM_LANGS = new Set(['wasm_cpp','wasm_rust','wasm_go'])
+const CONFIG_LIST = Object.entries(LANG_CONFIG).map(([k,v])=>({key:k,...v}))
+
+// ─── STATE ───
+const state = {
+  currentLang: 'cpp',
+  files: {},
+  fileOrder: [],
+  activeFileId: null,
+  executionState: 'idle',
+  editor: null,
+  ws: null,
+  term: null,
+  wasmOutput: null,
+  exitCode: null,
+  execTime: null,
+  inputBuffer: '',
+}
+
+// ─── DOM REFS ───
+const $ = s => document.querySelector(s)
+const el = {
+  langSelect: $('#langSelect'),
+  runBtn: $('#runBtn'),
+  stopBtn: $('#stopBtn'),
+  fileLabel: $('#fileLabel'),
+  addFileBtn: $('#addFileBtn'),
+  renameFileBtn: $('#renameFileBtn'),
+  delFileBtn: $('#delFileBtn'),
+  addFileBtn2: $('#addFileBtn2'),
+  newFileForm: $('#newFileForm'),
+  newFileName: $('#newFileName'),
+  confirmAdd: $('#confirmAdd'),
+  fileList: $('#fileList'),
+  editor: $('#editor'),
+  termContainer: $('#terminal-container'),
+  wasmBar: $('#wasm-bar'),
+  wasmInfo: $('#wasm-info'),
+  wasmLink: $('#wasm-link'),
+  exitCode: $('#exitCode'),
+  execTime: $('#execTime'),
+  statusDot: $('#statusDot'),
+  statusMsg: $('#statusMsg'),
+  statusStats: $('#statusStats'),
+}
+
+// ─── INIT ───
+function init() {
+  populateLangSelect()
+  initFileSystem()
+  initEditor()
+  initTerminal()
+  initEvents()
+}
+
+function populateLangSelect() {
+  el.langSelect.innerHTML = CONFIG_LIST.map(c =>
+    `<option value="${c.key}">${c.label}</option>`
+  ).join('')
+  el.langSelect.value = 'cpp'
+}
+
+// ─── FILE SYSTEM ───
+let fileCounter = 0
+
+function initFileSystem() {
+  const cfg = LANG_CONFIG.cpp
+  const id = 'f_' + (++fileCounter)
+  state.files[id] = { id, name: cfg.defaultFile, content: cfg.template }
+  state.fileOrder = [id]
+  state.activeFileId = id
+  renderFileList()
+  updateFileLabel()
+}
+
+function createFile(name) {
+  const ext = '.' + name.split('.').pop()
+  // find matching lang by extension
+  let langKey = 'cpp'
+  for (const [k, v] of Object.entries(LANG_CONFIG)) {
+    if (v.ext === ext) { langKey = k; break }
+  }
+  // default to current lang if no match
+  const cfg = LANG_CONFIG[langKey] || LANG_CONFIG[state.currentLang]
+  const id = 'f_' + (++fileCounter)
+  state.files[id] = { id, name, content: cfg.template }
+  state.fileOrder.push(id)
+  switchFile(id)
+  renderFileList()
+}
+
+function switchFile(id) {
+  if (!state.files[id]) return
+  state.activeFileId = id
+  const file = state.files[id]
+  updateFileLabel()
+  renderFileList()
+  setEditorValue(file.content)
+}
+
+function updateFileLabel() {
+  const file = state.files[state.activeFileId]
+  el.fileLabel.textContent = file ? file.name : ''
+}
+
+function getActiveContent() {
+  const file = state.files[state.activeFileId]
+  return file ? getEditorValue() || file.content : ''
+}
+
+function saveEditorContent() {
+  if (!state.activeFileId) return
+  const file = state.files[state.activeFileId]
+  if (file) file.content = getEditorValue() || file.content
+}
+
+function renameActiveFile(name) {
+  if (!state.activeFileId) return
+  const file = state.files[state.activeFileId]
+  const oldName = file.name
+  file.name = name
+  updateFileLabel()
+  renderFileList()
+  // enforce Java naming
+  if (state.currentLang === 'java' && name !== 'Main.java') {
+    // show warning but don't block
+  }
+  // if extension changed, editor language might need to change
+  const ext = '.' + name.split('.').pop()
+  for (const [k, v] of Object.entries(LANG_CONFIG)) {
+    if (v.ext === ext && k !== state.currentLang) {
+      switchLanguage(k)
+      break
+    }
+  }
+}
+
+function deleteActiveFile() {
+  if (!state.activeFileId || state.fileOrder.length <= 1) return
+  const id = state.activeFileId
+  const idx = state.fileOrder.indexOf(id)
+  delete state.files[id]
+  state.fileOrder = state.fileOrder.filter(fid => fid !== id)
+  // switch to neighbor
+  const next = state.fileOrder[Math.min(idx, state.fileOrder.length - 1)]
+  state.activeFileId = next
+  renderFileList()
+  updateFileLabel()
+  if (state.files[next]) setEditorValue(state.files[next].content)
+}
+
+function renderFileList() {
+  const items = state.fileOrder.map(id => {
+    const f = state.files[id]
+    if (!f) return ''
+    const active = id === state.activeFileId ? 'active' : ''
+    const icon = langIcon(f.name)
+    return `<div class="file-item ${active}" data-id="${id}">
+      <span class="icon">${icon}</span>
+      <span class="name">${escapeHtml(f.name)}</span>
+      <span class="file-ops">
+        <button class="rename-btn" data-id="${id}" title="Rename">✎</button>
+        ${state.fileOrder.length > 1 ? `<button class="del-btn" data-id="${id}" title="Delete">×</button>` : ''}
+      </span>
+    </div>`
+  }).join('')
+  el.fileList.innerHTML = items || '<div style="color:var(--fg2);padding:12px;font-size:12px;text-align:center">No files</div>'
+}
+
+function langIcon(name) {
+  const ext = name.split('.').pop()
+  const map = { py:'🐍', js:'🟢', ts:'🟦', cpp:'⚡', c:'⚡', h:'⚡', hpp:'⚡', java:'☕', cs:'#' , go:'🔷', rs:'🦀', wasm:'🧩', txt:'📄', json:'📋', html:'🌐', css:'🎨' }
+  return map[ext] || '📄'
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div')
+  d.textContent = s
+  return d.innerHTML
+}
+
+// ─── LANGUAGE SWITCHING ───
+function switchLanguage(key) {
+  saveEditorContent()
+  state.currentLang = key
+  const cfg = LANG_CONFIG[key]
+  el.langSelect.value = key
+  setEditorLanguage(cfg.monaco)
+  // rename active file to match extension if needed
+  const file = state.files[state.activeFileId]
+  if (file) {
+    const oldExt = '.' + file.name.split('.').pop()
+    if (oldExt !== cfg.ext) {
+      const base = cfg.defaultFile.replace(cfg.ext, '')
+      file.name = base + cfg.ext
+      updateFileLabel()
+      renderFileList()
+    }
+    // if editor content is empty or still template, offer template
+    const content = getEditorValue() || file.content
+    if (!content.trim() || content === file.content) {
+      file.content = cfg.template
+      setEditorValue(cfg.template)
+    }
+  }
+  // enforce Java naming
+  if (key === 'java' && file && file.name !== 'Main.java') {
+    file.name = 'Main.java'
+    updateFileLabel()
+    renderFileList()
+  }
+}
+
+// ponytail: textarea editor, no deps, works everywhere
+function initEditor() {
+  const cfg = LANG_CONFIG.cpp
+  el.editor.innerHTML = '<textarea id="editor-ta" style="width:100%;height:100%;background:#1e1e1e;color:#e0e0e0;border:none;padding:12px;font-family:\'Cascadia Code\',\'Fira Code\',Consolas,monospace;font-size:14px;outline:none;resize:none" spellcheck="false"></textarea>'
+  const ta = document.getElementById('editor-ta')
+  ta.value = cfg.template
+  ta.addEventListener('input', () => saveEditorContent())
+}
+function getEditorValue() { const ta=document.getElementById('editor-ta'); return ta?ta.value:'' }
+function setEditorValue(val) { const ta=document.getElementById('editor-ta'); if(ta) ta.value=val }
+function setEditorLanguage(lang) {} // ponytail: plain textarea, no highlighting
+
+// ─── TERMINAL ───
+function initTerminal() {
+  state.term = new Terminal({
+    cursorBlink: true,
+    cursorStyle: 'bar',
+    fontSize: 13,
+    fontFamily: "'Cascadia Code','Fira Code','Consolas',monospace",
+    theme: {
+      background: '#0d0d0d', foreground: '#e0e0e0',
+      cursor: '#aa3bff', selectionBackground: '#aa3bff44',
+      black: '#000', red: '#e53935', green: '#43a047',
+      yellow: '#fdd835', blue: '#1e88e5', magenta: '#aa3bff',
+      cyan: '#00bcd4', white: '#e0e0e0',
+    },
+    convertEol: true,
+    disableStdin: false,
+    scrollback: 5000,
+  })
+  state.term.open(el.termContainer)
+  state.term.onData(data => {
+    if (state.executionState !== 'executing' || state.ws?.readyState !== WebSocket.OPEN) return
+    if (data === '\r' || data === '\n') {
+      state.ws.send(JSON.stringify({ stdin_data: state.inputBuffer + '\n' }))
+      state.term.write('\r\n')
+      state.inputBuffer = ''
+    } else if (data === '\x7f' || data === '\b') {
+      if (state.inputBuffer.length > 0) {
+        state.inputBuffer = state.inputBuffer.slice(0, -1)
+        state.term.write('\b \b')
+      }
+    } else {
+      state.inputBuffer += data
+      state.term.write(data)
+    }
+  })
+  new ResizeObserver(() => {
+    const { width, height } = el.termContainer.getBoundingClientRect()
+    const cols = Math.max(20, Math.floor(width / 9.5))
+    const rows = Math.max(3, Math.floor(height / 18))
+    state.term.resize(cols, rows)
+  }).observe(el.termContainer)
+  state.term.writeln('\x1b[33mPolyglot IDE — run your code\x1b[0m')
+}
+
+// ─── EVENTS ───
+function initEvents() {
+  el.langSelect.addEventListener('change', e => switchLanguage(e.target.value))
+  el.runBtn.addEventListener('click', runCode)
+  el.stopBtn.addEventListener('click', stopExecution)
+  el.addFileBtn.addEventListener('click', () => showNewFileForm())
+  el.addFileBtn2.addEventListener('click', () => showNewFileForm())
+  el.renameFileBtn.addEventListener('click', () => promptRename())
+  el.delFileBtn.addEventListener('click', deleteActiveFile)
+  el.confirmAdd.addEventListener('click', () => addNewFile())
+  el.newFileName.addEventListener('keydown', e => { if (e.key === 'Enter') addNewFile(); if (e.key === 'Escape') hideNewFileForm() })
+  // file list events via delegation
+  el.fileList.addEventListener('click', e => {
+    const item = e.target.closest('.file-item')
+    const renameBtn = e.target.closest('.rename-btn')
+    const delBtn = e.target.closest('.del-btn')
+    if (renameBtn) { e.stopPropagation(); promptRenameFor(renameBtn.dataset.id); return }
+    if (delBtn) { e.stopPropagation(); deleteFileById(delBtn.dataset.id); return }
+    if (item) switchFile(item.dataset.id)
+  })
+  // keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); runCode() }
+  })
+}
+
+function showNewFileForm() {
+  el.newFileForm.style.display = 'flex'
+  el.newFileName.focus()
+}
+
+function hideNewFileForm() {
+  el.newFileForm.style.display = 'none'
+  el.newFileName.value = ''
+}
+
+function addNewFile() {
+  const name = el.newFileName.value.trim()
+  if (!name) return
+  createFile(name)
+  hideNewFileForm()
+}
+
+function promptRename() {
+  if (!state.activeFileId) return
+  promptRenameFor(state.activeFileId)
+}
+
+function promptRenameFor(id) {
+  const file = state.files[id]
+  if (!file) return
+  const newName = prompt('Rename file:', file.name)
+  if (newName && newName.trim() && newName !== file.name) {
+    // check for duplicates
+    if (state.fileOrder.some(fid => fid !== id && state.files[fid]?.name === newName.trim())) {
+      alert('A file with that name already exists.')
+      return
+    }
+    file.name = newName.trim()
+    if (id === state.activeFileId) updateFileLabel()
+    renderFileList()
+  }
+}
+
+function deleteFileById(id) {
+  if (state.fileOrder.length <= 1) return
+  const idx = state.fileOrder.indexOf(id)
+  delete state.files[id]
+  state.fileOrder = state.fileOrder.filter(fid => fid !== id)
+  if (state.activeFileId === id) {
+    const next = state.fileOrder[Math.min(idx, state.fileOrder.length - 1)]
+    state.activeFileId = next
+    if (state.files[next]) setEditorValue(state.files[next].content)
+  }
+  renderFileList()
+  updateFileLabel()
+}
+
+// ─── EXECUTION ───
+function getWsUrl() {
+  const params = new URLSearchParams(window.location.search)
+  const server = params.get('server') || 'localhost:8080'
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  if (params.get('server')) return `${proto}//${server}/ws/execute`
+  return `${proto}//${server}/ws/execute`
+}
+
+function runCode() {
+  if (state.executionState === 'queued' || state.executionState === 'executing') return
+
+  saveEditorContent()
+  const file = state.files[state.activeFileId]
+  if (!file) return
+  const code = file.content.trim()
+  if (!code) { setOutputLine('system', 'Error: No code to execute.'); return }
+
+  const cfg = LANG_CONFIG[state.currentLang]
+
+  const allFiles = {}
+  for (const fid of state.fileOrder) {
+    const f = state.files[fid]
+    if (f) allFiles[f.name] = f.content
+  }
+
+  clearOutput()
+  setExecutionState('queued')
+  el.runBtn.style.display = 'none'
+  el.stopBtn.style.display = 'inline-block'
+
+  state.ws = new WebSocket(getWsUrl())
+  const ws = state.ws
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({
+      source_code: code,
+      files: allFiles,
+      env_type: cfg.env_type,
+      language: cfg.language,
+      mode: 'interactive',
+      student_id: '00000000-0000-0000-0000-000000000000',
+      course_code: 'test',
+    }))
+  }
+
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data)
+      handleWsMessage(msg)
+    } catch (e) {
+      console.warn('[Malformed WS data]', event.data)
+    }
+  }
+
+  ws.onerror = () => {
+    setExecutionState('error')
+    setOutputLine('system', 'WebSocket connection error. Is the server running?')
+    finishExecution()
+  }
+
+  ws.onclose = () => {
+    state.ws = null
+    if (state.executionState === 'queued' || state.executionState === 'executing') {
+      setOutputLine('system', '⚠️ Connection closed before completion.')
+      finishExecution()
+    }
+  }
+}
+
+function handleWsMessage(msg) {
+  const status = msg.status
+
+  switch (status) {
+    case 'queued':
+      setExecutionState('queued')
+      setStatusMsg('Queued... waiting for resources')
+      setOutputLine('system', '⏳ Queued...')
+      break
+
+    case 'provisioning':
+      setExecutionState('executing')
+      setStatusMsg('Provisioning sandbox...')
+      setOutputLine('system', '🔧 Provisioning sandbox...')
+      break
+
+    case 'executing':
+      setExecutionState('executing')
+      setStatusMsg(msg.pod_name ? `Executing on ${msg.pod_name}...` : 'Executing...')
+      setOutputLine('system', `⚙️ Executing${msg.pod_name ? ' on ' + msg.pod_name : ''}...`)
+      if (msg.pod_name) el.statusStats.textContent = `Pod: ${msg.pod_name}`
+      break
+
+    case 'compiling':
+      setOutputLine('system', '🔨 Compiling...')
+      break
+
+    case 'compile_error':
+      setExecutionState('error')
+      setStatusMsg('Compilation failed')
+      setOutputLine('system', '❌ Compilation failed:')
+      if (msg.stderr) appendStderr(msg.stderr)
+      if (msg.errors) appendStderr(msg.errors)
+      finishExecution()
+      break
+
+    case 'running':
+      if (msg.stdout_output) appendStdout(msg.stdout_output)
+      if (msg.stderr_output) appendStderr(msg.stderr_output)
+      break
+
+    case 'stdout':
+      if (msg.stdout) appendStdout(msg.stdout)
+      break
+
+    case 'stderr':
+      if (msg.stderr) appendStderr(msg.stderr)
+      break
+
+    case 'completed':
+      setExecutionState('completed')
+      state.exitCode = msg.exit_code
+      state.execTime = msg.execution_time_ms
+      if (msg.stdout) appendStdout(msg.stdout)
+      if (msg.stderr) appendStderr(msg.stderr)
+      updateMeta()
+      // WASM handling
+      if (WASM_LANGS.has(state.currentLang) && msg.stdout) {
+        state.wasmOutput = msg.stdout
+        showWasmOutput(msg.stdout)
+      }
+      setStatusMsg('✅ Completed')
+      finishExecution()
+      break
+
+    case 'timeout':
+      setExecutionState('error')
+      state.exitCode = msg.exit_code
+      setStatusMsg('⏱️ Timed out')
+      setOutputLine('system', '⏱️ Execution timed out.')
+      updateMeta()
+      finishExecution()
+      break
+
+    case 'error':
+      setExecutionState('error')
+      setStatusMsg('❌ Error: ' + (msg.message || 'Execution failed'))
+      setOutputLine('system', '❌ ' + (msg.message || 'Execution failed'))
+      finishExecution()
+      break
+
+    default:
+      if (msg.stdout) appendStdout(msg.stdout)
+      if (msg.stderr) appendStderr(msg.stderr)
+  }
+}
+
+function appendStdout(text) {
+  state.term.writeln(text)
+}
+
+function appendStderr(text) {
+  state.term.writeln('\x1b[31m' + text + '\x1b[0m')
+}
+
+function setOutputLine(cls, text) {
+  state.term.writeln('\x1b[33m' + text + '\x1b[0m')
+}
+
+function clearOutput() {
+  state.inputBuffer = ''
+  state.wasmOutput = null
+  state.term.clear()
+  el.wasmBar.style.display = 'none'
+  el.exitCode.textContent = 'Exit: —'
+  el.execTime.textContent = 'Time: —'
+  el.statusStats.textContent = ''
+  state.term.writeln('\x1b[33m━━━ Running ─────────────────────────────────\x1b[0m')
+}
+
+function downloadBlob(blob, filename) {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
+function showWasmOutput(stdout) {
+  const isBase64 = /^[A-Za-z0-9+/=]+$/.test(stdout.trim())
+  state.term.writeln('\x1b[35m━━━ WASM Artifact ────────────────────────────\x1b[0m')
+  if (isBase64) {
+    const sizeKB = (stdout.length * 0.75 / 1024).toFixed(1)
+    state.term.writeln('\x1b[35m' + sizeKB + ' KB wasm binary\x1b[0m')
+    el.wasmInfo.textContent = sizeKB + ' KB binary'
+    el.wasmLink.textContent = '⬇ Download .wasm'
+    el.wasmLink.onclick = () => {
+      const binary = Uint8Array.from(atob(stdout), c => c.charCodeAt(0))
+      downloadBlob(new Blob([binary], { type: 'application/wasm' }), 'output.wasm')
+    }
+  } else {
+    state.term.writeln('\x1b[35mJS glue code (' + stdout.length + ' chars)\x1b[0m')
+    el.wasmInfo.textContent = 'JavaScript glue code'
+    el.wasmLink.textContent = '⬇ Download .js'
+    el.wasmLink.onclick = () => downloadBlob(new Blob([stdout], { type: 'text/javascript' }), 'output.js')
+  }
+  el.wasmBar.style.display = 'flex'
+}
+
+function updateMeta() {
+  const exit = state.exitCode
+  const exitEl = el.exitCode
+  exitEl.textContent = `Exit: ${exit !== null ? exit : '—'}`
+  exitEl.className = 'exit' + (exit === 0 ? ' ok' : exit !== null ? ' err' : '')
+  if (state.execTime !== null) {
+    el.execTime.textContent = `Time: ${state.execTime.toFixed(1)} ms`
+  }
+}
+
+function finishExecution() {
+  el.runBtn.style.display = 'inline-block'
+  el.stopBtn.style.display = 'none'
+  state.ws = null
+}
+
+function stopExecution() {
+  setExecutionState('idle')
+  if (state.ws) {
+    try { state.ws.close(1000, 'cancelled') } catch(e) {}
+    state.ws = null
+  }
+  setOutputLine('system', '■ Cancelled.')
+  el.runBtn.style.display = 'inline-block'
+  el.stopBtn.style.display = 'none'
+}
+
+function setExecutionState(s) {
+  state.executionState = s
+  el.statusDot.className = 'dot ' + s
+}
+
+function setStatusMsg(msg) {
+  el.statusMsg.textContent = msg
+}
+
+// ─── START ───
+document.addEventListener('DOMContentLoaded', init)
+</script>
+</body>
+</html>

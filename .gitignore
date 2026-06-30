@@ -77,3 +77,19 @@ mock_sandbox.py
 *Dockerfile.txt
 *.svg
 .backup*
+
+# Test payload debris
+c#.cs
+calander.c
+cpp.cpp
+csharp_main.cs
+exec.py
+gui1.cpp
+java_main.java
+main.go
+node_main.js
+python_payload.py
+rust_main.rs
+wasm_go_main.go
+wasm_main.cpp
+wasm_rust_main.rs

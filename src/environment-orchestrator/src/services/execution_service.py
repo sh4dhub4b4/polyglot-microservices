@@ -28,7 +28,7 @@ class ExecutionService:
         provisioner = self._get_provisioner(is_gui)
         return provisioner.get_pod_ip(pod_name)
         
-    def execute_code(self, pod_name: str, source_code: str, stdin_data: str, env_type: str, is_gui: bool = False) -> Dict[str, Any]:
+    def execute_code(self, pod_name: str, source_code: str, stdin_data: str, env_type: str, is_gui: bool = False, files: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         provisioner = self._get_provisioner(is_gui)
         try:
             pod_ip = None
@@ -41,7 +41,7 @@ class ExecutionService:
             if not pod_ip:
                 raise Exception(f"Pod {pod_name} did not get an IP in time.")
                 
-            result = self.engine_client.execute_code(pod_ip, source_code, stdin_data, env_type, pod_name=pod_name)
+            result = self.engine_client.execute_code(pod_ip, source_code, stdin_data, env_type, pod_name=pod_name, files=files)
             is_success = True
             return result
         except Exception as e:

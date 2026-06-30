@@ -49,6 +49,7 @@ def resolve_pod_catalog(task: dict) -> dict:
     # Legacy fallback map for backward compatibility with older clients
     legacy_map = {
         "cpp": "cpp-basic",
+        "c-basic": "cpp-basic",
         "python": "python-ds",
         "java": "java-basic",
         "csharp": "csharp-dotnet",
@@ -126,7 +127,8 @@ def handle_batch_task(task: dict, task_id: str):
             source_code=task["source_code"],
             stdin_data=task.get("stdin_data", ""),
             env_type=task["env_type"],
-            is_gui=task["is_gui"]
+            is_gui=task["is_gui"],
+            files=task.get("files")
         )
         
         exec_res["pod_name"] = pod_name

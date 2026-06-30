@@ -91,6 +91,8 @@ class WebSocketRelayAdapter:
                 "language": lang,
                 "source_code": payload["source_code"],
             }
+            if "files" in payload:
+                initial_msg["files"] = payload["files"]
             if "stdin_data" in payload and payload["stdin_data"]:
                 initial_msg["stdin_data"] = payload["stdin_data"]
             await ws.send(json.dumps(initial_msg))

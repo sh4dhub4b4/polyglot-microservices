@@ -31,6 +31,6 @@ class ISandboxProvisioner(ABC):
 
 class IEngineClient(ABC):
     @abstractmethod
-    def execute_code(self, pod_ip: str, source_code: str, stdin_data: str, env_type: str) -> Dict[str, Any]:
+    def execute_code(self, pod_ip: str, source_code: str, stdin_data: str, env_type: str, files: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Executes code by communicating with the sandbox engine."""
         pass

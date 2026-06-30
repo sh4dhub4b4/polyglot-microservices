@@ -16,4 +16,9 @@ services:
       - SYS_PTRACE # Required for C++ GDB debugging
     security_opt:
       - seccomp:unconfined
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     command: sleep infinity

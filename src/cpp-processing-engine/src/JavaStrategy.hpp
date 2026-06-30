@@ -7,7 +7,7 @@ protected:
     std::string get_source_file_path() const override { return "/tmp/Main.java"; }
     
     std::vector<std::string> get_compile_command() const override {
-        return {"javac", "-J-Xmx128m", "-J-Xms32m", "-J-XX:MaxMetaspaceSize=64m", "-J-XX:CompressedClassSpaceSize=32m", "-J-Xss256k", "-J-XX:MaxDirectMemorySize=10m", "/tmp/Main.java"};
+        return {"javac", "-J-Xmx128m", "-J-Xms32m", "-J-XX:MaxMetaspaceSize=64m", "-J-XX:CompressedClassSpaceSize=32m", "-J-Xss256k", "-J-XX:MaxDirectMemorySize=10m", "-cp", "/tmp", "/tmp/Main.java"};
     }
     
     std::vector<std::string> get_execute_command() const override {

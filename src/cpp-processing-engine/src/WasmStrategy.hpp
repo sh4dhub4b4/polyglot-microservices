@@ -11,13 +11,7 @@ protected:
     std::vector<std::string> get_compile_command() const override
     {
         return {
-            "emcc", 
-            "/tmp/main.cpp", 
-            "-o", "/tmp/output.js", 
-            "-s", "WASM=1", 
-            "-s", "SINGLE_FILE=1", // Embeds the WASM binary inside the JS as base64
-            "-O3",                 // Maximum optimization for client-side performance
-            "-std=c++17"
+            "sh", "-c", "cd /tmp && emcc *.cpp -o output.js -s WASM=1 -s SINGLE_FILE=1 -O3 -std=c++17"
         };
     }
 

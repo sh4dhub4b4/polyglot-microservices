@@ -20,7 +20,7 @@ protected:
     std::vector<std::string> get_compile_command() const override
     {
         return {
-            "go", "build", "-o", "/tmp/main.wasm", "/tmp/main.go"
+            "sh", "-c", "export GOCACHE=/tmp && export HOME=/tmp && export GOOS=js && export GOARCH=wasm && cd /tmp && ([ -f go.mod ] || go mod init app) && go build -o /tmp/main.wasm ."
         };
     }
 

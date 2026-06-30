@@ -1,7 +1,7 @@
 import socket
 import time
 import requests
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from domain.ports import IEngineClient
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
@@ -30,7 +30,7 @@ class HttpExecutorAdapter(IEngineClient):
         retry=retry_if_exception_type(requests.exceptions.RequestException),
         reraise=True
     )
-    def execute_code(self, pod_ip: str, source_code: str, stdin_data: str, env_type: str, pod_name: str = None) -> Dict[str, Any]:
+    def execute_code(self, pod_ip: str, source_code: str, stdin_data: str, env_type: str, pod_name: str = None, files: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         import os
         import socket
         import subprocess
@@ -62,13 +62,16 @@ class HttpExecutorAdapter(IEngineClient):
             print(f"🔌 [Executor] Sending request to sandbox engine at {host}:{port}...")
             sandbox_url = f"http://{host}:{port}/api/v1/execute"
             
+            body = {
+                "language": env_type,
+                "source_code": source_code,
+                "stdin_data": stdin_data
+            }
+            if files:
+                body["files"] = files
             response = requests.post(
                 sandbox_url, 
-                json={
-                    "language": env_type,
-                    "source_code": source_code,
-                    "stdin_data": stdin_data
-                },
+                json=body,
                 timeout=120
             )
             

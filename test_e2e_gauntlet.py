@@ -19,7 +19,7 @@ cin>>x;
 cout<<"Hello "<<x<<endl;
 return 0;}"""
     },
-        "gui-cpp": {
+    "gui-cpp": {
         "language": "cpp-opengl",
         "course_code": "GUI-101",
         "source_code": r"""#include <GL/glew.h>

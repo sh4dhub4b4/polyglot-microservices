@@ -15,6 +15,7 @@ class ExecutionRequest(BaseModel):
     language: str
     source_code: str
     stdin_data: Optional[str] = ""
+    files: Optional[Dict[str, str]] = None
 
     class Config:
         extra = "ignore"
@@ -47,6 +48,15 @@ def kill_current_app():
             current_process.kill()
     current_process = None
 
+def write_all_files(project_dir: str, files: Optional[Dict[str, str]]):
+    if not files:
+        return
+    for filename, content in files.items():
+        filepath = os.path.join(project_dir, filename)
+        with open(filepath, "w") as f:
+            f.write(content)
+        os.chown(filepath, 10002, 10002)
+
 @app.post("/api/v1/execute")
 async def execute_gui_code(req: ExecutionRequest):
     global current_process, last_activity_time
@@ -64,7 +74,10 @@ async def execute_gui_code(req: ExecutionRequest):
     
     with open(main_file, "w") as f:
         f.write(req.source_code)
-    os.chown(main_file, 10002, 10002) # Give ownership to sandboxuser
+    os.chown(main_file, 10002, 10002)
+
+    # Write additional files for multi-file support
+    write_all_files(project_dir, req.files)
 
     if not main_file:
         raise HTTPException(status_code=400, detail="Could not determine main file")
@@ -135,6 +148,8 @@ async def websocket_endpoint(websocket: WebSocket):
         with open(main_file, "w") as f:
             f.write(req.source_code)
         os.chown(main_file, 10002, 10002)
+
+        write_all_files(project_dir, req.files)
         
         # 4. Compile
         if req.language == "gui-python":

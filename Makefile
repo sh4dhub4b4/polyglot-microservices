@@ -190,6 +190,9 @@ dev-seed:
 	@echo "Done."
 
 dev-gateway:
+	@echo "Releasing port 8080 from K8s..."
+	-kubectl scale deployment eci-gateway --replicas=0 -n eci-system 2>/dev/null
+	-kubectl patch svc eci-gateway -n eci-system -p '{"spec":{"type":"ClusterIP"}}' 2>/dev/null
 	@echo "Starting Local API Gateway (Hot Reload Enabled)..."
 	cd src/api-gateway && REDIS_HOST=localhost ENV=development DATABASE_URL='postgresql://postgres:postgres@localhost:5432/polyglot' ../../.venv/Scripts/python.exe -m uvicorn main:app --app-dir src --host 0.0.0.0 --port 8080 --reload
 

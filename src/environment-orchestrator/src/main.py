@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uuid
-from typing import Optional
+from typing import Optional, Dict
 
 # Clean Architecture Imports
 from adapters.redis_lock_adapter import RedisLockAdapter
@@ -36,6 +36,7 @@ class ExecuteRequest(BaseModel):
     stdin_data: Optional[str] = ""
     env_type: str
     is_gui: bool = False
+    files: Optional[Dict[str, str]] = None
 
 # --- Endpoints ---     
 @app.post("/api/v1/orchestrate/provision")
@@ -75,7 +76,8 @@ def execute_code(request: ExecuteRequest):
             source_code=request.source_code,
             stdin_data=request.stdin_data,
             env_type=request.env_type,
-            is_gui=request.is_gui
+            is_gui=request.is_gui,
+            files=request.files
         )
         return result
     except Exception as e:

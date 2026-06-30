@@ -84,7 +84,7 @@ async def websocket_endpoint(websocket: WebSocket):
         # Set SKIP_LIGHTWEIGHT=1 to force all execution through K8s (for debugging)
         source_code = payload.get("source_code", "")
         skip_lightweight = os.getenv("SKIP_LIGHTWEIGHT", "0") == "1"
-        if not skip_lightweight and is_lightweight_payload(source_code, env_type):
+        if not skip_lightweight and mode != "interactive" and is_lightweight_payload(source_code, env_type):
             print(f"[INFO] Lightweight payload detected. Executing locally, bypassing K8s.")
             await websocket.send_json({"status": "executing", "message": "Executing locally..."})
             

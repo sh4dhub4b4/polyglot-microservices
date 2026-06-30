@@ -1,0 +1,4 @@
+.venv/
+.env
+worker_stderr.log
+worker_stdout.log

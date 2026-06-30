@@ -7,7 +7,7 @@ protected:
     std::string get_source_file_path() const override { return "/tmp/main.cpp"; }
     
     std::vector<std::string> get_compile_command() const override {
-        return {"g++", "-O2", "-std=c++17", "/tmp/main.cpp", "-o", "/tmp/student_exec"};
+        return {"sh", "-c", "cd /tmp && g++ -O2 -std=c++17 *.cpp -o student_exec"};
     }
     
     std::vector<std::string> get_execute_command() const override {

@@ -14,6 +14,7 @@
 #include "WasmRustStrategy.hpp"
 #include "WasmGoStrategy.hpp"
 #include <iostream>
+#include <fstream>
 #include <thread>
 #include <chrono>
 #include <mutex>
@@ -53,6 +54,17 @@ std::unique_ptr<IExecutionStrategy> get_strategy(const std::string& env_type) {
     return strategy;
 }
 
+// Writes all files from the "files" map to /tmp/ before compilation
+void write_files(const json& payload) {
+    if (payload.contains("files") && payload["files"].is_object()) {
+        for (auto& [filename, content] : payload["files"].items()) {
+            std::ofstream out("/tmp/" + filename);
+            out << content.get<std::string>();
+            out.close();
+        }
+    }
+}
+
 int main()
 {
     httplib::Server svr;
@@ -73,7 +85,10 @@ int main()
             std::string source_code = payload.at("source_code").get<std::string>();
             std::string stdin_data = payload.contains("stdin_data") ? payload.at("stdin_data").get<std::string>() : "";
 
-            // 2. Configure the Orchestrator for the requested language
+            // 2a. Write multi-file payloads (if any) to /tmp/
+            write_files(payload);
+
+            // 2b. Configure the Orchestrator for the requested language
             orchestrator.set_language(language);
 
             // 3. Execute the code safely inside our SecurityContainer constraints
@@ -132,6 +147,9 @@ int main()
             auto payload = json::parse(init_msg);
             std::string language = payload.at("language").get<std::string>();
             std::string source_code = payload.at("source_code").get<std::string>();
+
+            // Write multi-file payloads (if any) to /tmp/ before compile
+            write_files(payload);
 
             // ── Step 2: Create session and compile ──
             InteractiveSession session(language);
@@ -276,6 +294,7 @@ int main()
                         if (input.contains("stdin_data"))
                         {
                             session.write_stdin(input.at("stdin_data").get<std::string>());
+                            session.close_stdin(); // ponytail: EOF after first write (matches batch file semantics)
                         }
                         if (input.contains("close_stdin") && input.at("close_stdin").get<bool>())
                         {

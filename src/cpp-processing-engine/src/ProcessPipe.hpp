@@ -106,8 +106,13 @@ public:
                 setup_env();
             }
 
-            // Build the execvp argument array
+            // Build the execvp argument array with stdbuf wrapper for line-buffered I/O
+            // Without this, C/C++ programs buffer 4KB when piped → prompts never reach the user
             std::vector<char *> args;
+            // ponytail: unbuffered stdout (mode 0) makes every printf hit the pipe before scanf runs
+            args.push_back(const_cast<char *>("stdbuf"));
+            args.push_back(const_cast<char *>("-o0"));
+            args.push_back(const_cast<char *>("-e0"));
             for (const auto &arg : command)
             {
                 args.push_back(const_cast<char *>(arg.c_str()));
