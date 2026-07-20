@@ -65,23 +65,36 @@ def seed_db():
         db.commit()
         print("[*] Committed PodCatalog updates.")
 
-        # Redis Sync via kubectl (Phase 1.2: Orchestrator Cache)
-        print("[*] Synchronizing PodCatalog to K8s Redis via kubectl...")
-        for pod in pods:
-            json_val = json.dumps({
-                "docker_image": pod.docker_image,
-                "is_gui": pod.is_gui,
-                "base_cost": pod.base_cost
-            })
-            # Use kubectl to set the key directly inside the cluster
-            cmd = [
-                "kubectl", "exec", "deployment/redis", "-n", "eci-system", "--",
-                "redis-cli", "set", f"pod_catalog:{pod.id}", json_val
-            ]
-            try:
-                subprocess.run(cmd, check=True, capture_output=True)
-            except subprocess.CalledProcessError as e:
-                print(f"[!] Warning: Failed to sync {pod.id} to Redis. {e.stderr.decode('utf-8') if e.stderr else ''}")
+        # Redis Sync (Phase 1.2: Orchestrator Cache)
+        redis_url = os.getenv("REDIS_URL", "")
+        if redis_url:
+            import redis as redis_client
+            r = redis_client.from_url(redis_url, decode_responses=True)
+            print(f"[*] Synchronizing PodCatalog to Redis via REDIS_URL...")
+            for pod in pods:
+                json_val = json.dumps({
+                    "docker_image": pod.docker_image,
+                    "is_gui": pod.is_gui,
+                    "base_cost": pod.base_cost
+                })
+                r.set(f"pod_catalog:{pod.id}", json_val)
+                print(f"    [+] Synced {pod.id}")
+        else:
+            print("[*] Synchronizing PodCatalog to K8s Redis via kubectl...")
+            for pod in pods:
+                json_val = json.dumps({
+                    "docker_image": pod.docker_image,
+                    "is_gui": pod.is_gui,
+                    "base_cost": pod.base_cost
+                })
+                cmd = [
+                    "kubectl", "exec", "deployment/redis", "-n", "eci-system", "--",
+                    "redis-cli", "set", f"pod_catalog:{pod.id}", json_val
+                ]
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True)
+                except subprocess.CalledProcessError as e:
+                    print(f"[!] Warning: Failed to sync {pod.id} to Redis. {e.stderr.decode('utf-8') if e.stderr else ''}")
         print("[*] Synchronized PodCatalog to Redis cache.")
 
         # Seed a dummy tenant (University) and map all pods to them so testing works smoothly

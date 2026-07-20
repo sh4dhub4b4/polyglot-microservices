@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: polyglot-gateway
+    env: docker
+    dockerfilePath: src/api-gateway/Dockerfile
+    envVars:
+      - key: REDIS_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        value: dev-secret-key-change-in-production
+      - key: ENV
+        value: production
+      - key: CORS_ORIGINS
+        value: https://polyglot-ide.onrender.com
+    healthCheckPath: /api/health
+
+  - type: static
+    name: polyglot-ide
+    buildCommand: ""
+    publishPath: ide
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY

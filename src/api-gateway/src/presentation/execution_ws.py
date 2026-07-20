@@ -6,13 +6,13 @@ from infrastructure.orm_models import PodCatalogORM, EnrollmentORM, CourseOfferi
 from presentation.metrics_router import pod_spawns_total
 from use_cases.wasm_router import is_lightweight_payload
 from use_cases.local_executor import execute_local
+from use_cases.auth_service import decode_access_token
 from uuid6 import uuid7
 
 router = APIRouter()
 
-# 🚀 HYBRID CLOUD: Use local redis if testing locally, otherwise use K8s internal DNS
-REDIS_HOST = os.getenv("REDIS_HOST", "redis-svc.eci-system.svc.cluster.local")
-redis_client = redis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 @router.websocket("/ws/execute")
 async def websocket_endpoint(websocket: WebSocket):
@@ -27,9 +27,32 @@ async def websocket_endpoint(websocket: WebSocket):
         # Add Task ID to the payload so the Orchestrator knows where to send updates back
         payload["task_id"] = task_id
         
+        # ═══════════════════════════════════════════════════════════════
+        # JWT Validation — extract verified student_id from token
+        # ═══════════════════════════════════════════════════════════════
+        ENV = os.getenv("ENV", "production")
+        token = payload.get("token")
+        jwt_payload = decode_access_token(token) if token else None
+
+        if ENV == "development" and not jwt_payload:
+            # ponytail: dev bypass — skip JWT, use payload student_id or default
+            student_id_str = payload.get("student_id", "00000000-0000-0000-0000-000000000000")
+            payload["student_id"] = student_id_str
+        elif not jwt_payload:
+            await websocket.send_json({"status": "error", "message": "Authentication required. Provide a valid token."})
+            await websocket.close(code=1008)
+            return
+        else:
+            student_id_str = jwt_payload.get("sub")
+            if jwt_payload.get("role") != "STUDENT":
+                await websocket.send_json({"status": "error", "message": "Only students can execute code."})
+                await websocket.close(code=1008)
+                return
+            # Override payload with verified student_id (trust the token, not user input)
+            payload["student_id"] = student_id_str
+        
         # 🚀 Phase 3 Gateway Validation Check
         env_type = payload.get("env_type") or payload.get("language")
-        student_id_str = payload.get("student_id")
         
         # 1. Fetch PodCatalog info synchronously using SQLAlchemy (or fetch from Redis Cache)
         # For security validation, we check the DB directly to ensure owner_faculty_id rules

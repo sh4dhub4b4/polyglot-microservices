@@ -5,9 +5,7 @@ import redis.asyncio as aioredis
 import os
 from typing import Dict, Any
 
-# SRE Note: This adapter requires the 'websockets' package (already used in test_e2e_gauntlet.py)
-
-REDIS_HOST = os.getenv("REDIS_HOST", "redis-svc.eci-system.svc.cluster.local")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 
 class WebSocketRelayAdapter:

@@ -14,19 +14,24 @@ from adapters.http_executor_adapter import HttpExecutorAdapter
 from adapters.ws_relay_adapter import WebSocketRelayAdapter
 from services.execution_service import ExecutionService
 
-# SRE Note: Worker will use synchronous Redis to match k8s_manager's synchronous flow
-REDIS_HOST = os.getenv("REDIS_HOST", "redis-svc.eci-system.svc.cluster.local")
-redis_client = redis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
-# Async Redis client for interactive mode (WebSocket relay needs async I/O)
-async_redis_client = aioredis.Redis(host=REDIS_HOST, port=6379, db=0, decode_responses=True)
+async_redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
 
-# Dependency Injection setup
 lock_manager = RedisLockAdapter()
-provisioners = {
-    "algo": K8sProvisionerAdapter(lock_manager=lock_manager),
-    "gui": GuiProvisionerAdapter()
-}
+env_mode = os.getenv("ENV", "")
+if env_mode == "dev_local":
+    from adapters.local_provisioner_adapter import LocalProvisionerAdapter
+    provisioners = {
+        "algo": LocalProvisionerAdapter(lock_manager=lock_manager),
+        "gui": LocalProvisionerAdapter(lock_manager=lock_manager)
+    }
+else:
+    provisioners = {
+        "algo": K8sProvisionerAdapter(lock_manager=lock_manager),
+        "gui": GuiProvisionerAdapter()
+    }
 engine_client = HttpExecutorAdapter()
 ws_relay = WebSocketRelayAdapter()
 k8s_manager = ExecutionService(provisioners=provisioners, lock_manager=lock_manager, engine_client=engine_client)

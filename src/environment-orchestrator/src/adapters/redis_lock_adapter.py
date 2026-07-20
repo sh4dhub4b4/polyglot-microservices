@@ -4,13 +4,8 @@ from domain.ports import ILockManager
 
 class RedisLockAdapter(ILockManager):
     def __init__(self):
-        redis_host = os.getenv("REDIS_HOST", "redis-svc.eci-system.svc.cluster.local")
-        self.redis_client = redis.Redis(
-            host=redis_host, 
-            port=6379, 
-            db=0, 
-            decode_responses=True
-        )
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        self.redis_client = redis.from_url(redis_url, decode_responses=True)
 
     def acquire_lock(self, lock_key: str, ttl_seconds: int = 60) -> bool:
         try:

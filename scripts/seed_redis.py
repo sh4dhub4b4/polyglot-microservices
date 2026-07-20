@@ -1,5 +1,5 @@
-import redis, json
-r = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+import os, redis, json
+r = redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True)
 pods = {
     "cpp-basic": {"docker_image": "eci-cpp-engine:latest", "is_gui": False, "base_cost": 1.0},
     "python-ds": {"docker_image": "eci-python-engine:latest", "is_gui": False, "base_cost": 1.5},
