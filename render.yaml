@@ -16,10 +16,11 @@ services:
         value: https://polyglot-ide.onrender.com
     healthCheckPath: /api/health
 
-  - type: static
+  - type: web
     name: polyglot-ide
+    env: static
     buildCommand: ""
-    publishPath: ide
+    staticPublishPath: ide
     headers:
       - path: /*
         name: X-Frame-Options
