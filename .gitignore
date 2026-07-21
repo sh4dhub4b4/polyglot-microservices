@@ -93,3 +93,9 @@ rust_main.rs
 wasm_go_main.go
 wasm_main.cpp
 wasm_rust_main.rs
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
